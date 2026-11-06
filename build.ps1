@@ -28,6 +28,14 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Exe) | Out-Null
 
 Push-Location $Root
 try {
+    $busy = @(Get-Process -Name localrdp -ErrorAction SilentlyContinue | Where-Object {
+        try { $_.Path -eq $Exe } catch { $false }
+    })
+    if ($busy.Count -gt 0) {
+        $ids = ($busy | ForEach-Object { $_.Id }) -join ', '
+        Write-Host "  [ERR] 正在运行的 localrdp.exe（PID $ids）占着输出文件：先关掉它的窗口再编译。" -ForegroundColor Red
+        exit 1
+    }
     if ($Test) {
         & go vet ./...
         if ($LASTEXITCODE -ne 0) { Write-Host '  [ERR] go vet 失败。' -ForegroundColor Red; exit $LASTEXITCODE }

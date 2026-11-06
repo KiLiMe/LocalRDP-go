@@ -36,10 +36,13 @@ var (
 	procShowWindow               = user32.NewProc("ShowWindow")
 	procSetForegroundWindow      = user32.NewProc("SetForegroundWindow")
 	procSwitchToThisWindow       = user32.NewProc("SwitchToThisWindow")
+	procFindWindowW              = user32.NewProc("FindWindowW")
 	kernel32                     = syscall.NewLazyDLL("kernel32.dll")
 	procFreeConsole              = kernel32.NewProc("FreeConsole")
 	procAttachConsole            = kernel32.NewProc("AttachConsole")
 	procSetStdHandle             = kernel32.NewProc("SetStdHandle")
+	procCreateMutexW             = kernel32.NewProc("CreateMutexW")
+	procCloseHandle              = kernel32.NewProc("CloseHandle")
 )
 
 // swRestore is ShowWindow's SW_RESTORE.
