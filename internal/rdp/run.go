@@ -19,6 +19,7 @@ func printHelp() {
 	printOut("  localrdp desktop [options] [-- <program> [args...]]")
 	printOut("  localrdp stop")
 	printOut("  localrdp gui [options]")
+	printOut("  localrdp mcp")
 	printOut("  localrdp help")
 	printOut("")
 	printOut("Options (start / desktop):")
@@ -43,6 +44,9 @@ func printHelp() {
 	printOut("Options (gui):")
 	printOut("  -capture FILE      Write a PNG of the window there and quit")
 
+	printOut("")
+	printOut("The mcp verb speaks Model Context Protocol over stdin/stdout (JSON-RPC 2.0),")
+	printOut("for AI clients: see `localrdp mcp --help` for the tools it exposes.")
 	printOut("")
 	printOut("The child session is the same Windows account as this process. It is not a")
 	printOut("security boundary: files, tokens and installed apps are shared.")
@@ -137,6 +141,9 @@ func Run(args []string) int {
 	verb := args[1]
 	if eqFold(verb, "gui") || eqFold(verb, "ui") {
 		return runGui(args[2:])
+	}
+	if eqFold(verb, "mcp") {
+		return cmdMcp(args[2:])
 	}
 	opt := defaultOptions()
 	var programArgs []string

@@ -22,6 +22,26 @@ go build -trimpath -ldflags '-s -w' -o build\bin\Release\localrdp.exe .
 
 `localrdp-ui.ps1` 在找不到 exe 时调用 `build.ps1` 编译（等价于上面的 `go build`）。
 
+## AI 排查（MCP）
+
+`localrdp mcp` 在 stdin/stdout 上跑 Model Context Protocol 服务器（JSON-RPC 2.0，
+protocol `2025-06-18`，零第三方依赖），AI 客户端可直接读状态、翻日志、列会话、启停会话：
+
+```json
+{
+  "mcpServers": {
+    "localrdp": {
+      "command": "D:\\Sou\\LocalRDP-go\\build\\bin\\Release\\localrdp.exe",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+工具：`lrdp_status`、`lrdp_log`、`lrdp_sessions`、`lrdp_processes`、`lrdp_diag`、
+`lrdp_desktop`、`lrdp_start`、`lrdp_stop`；资源：`localrdp://status`、`localrdp://log`。
+详见 [使用说明.md 第 12 节](使用说明.md)。
+
 ## 能力矩阵
 
 | 能力 | 状态 |
@@ -62,6 +82,9 @@ internal/rdp/          package rdp：命令行、宿主、COM 容器、会话启
 
 internal/win32/        app 与 rdp 共用的小工具：Hidden/HideWindow、ExePath/ExeDir、
                        UTF16Ptr、Itoa —— 两边不再各写一份
+
+internal/mcp/          Model Context Protocol 服务端（JSON-RPC 2.0 over stdio）：
+                       initialize / tools/list / tools/call / resources/*，只用标准库
 ```
 
 `internal/`（分层，自底向上依赖）：
@@ -73,6 +96,7 @@ i18n/   英文文案 → 中文映射；缺条目回落英文，缺口可见
 store/  设置、记住的会话、DPAPI 加密密码（叶子包，不依赖其它内部包）
 ui/     窗口绘制：标题栏、菜单、控制台表单、会话栏、日志（只读 State）
 app/    窗口逻辑：动作、子进程管理、状态刷新、日志跟随
+mcp/    MCP 协议层（工具表由 internal/rdp/mcp.go 注册）
 ```
 
 脚本：`localrdp.cmd` / `localrdp-ui.ps1` / `install-privileges.ps1` / `build.ps1`
