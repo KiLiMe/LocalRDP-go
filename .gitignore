@@ -1,0 +1,10 @@
+# 编译产物
+/build/
+*.exe
+*.exe~
+*.dll
+*.pdb
+
+# 临时
+tmp_*/
+*.log
