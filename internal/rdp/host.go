@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	"github.com/lxn/win"
+	"localrdp/internal/store"
 	"localrdp/internal/win32"
 )
 
@@ -38,7 +39,18 @@ type hostState struct {
 	extReason     int32
 
 	appliedW, appliedH, appliedScale int
-	watchdogTicks                    int
+	// sizeMode is store.SizeFit, SizeFixed or SizeScale: what the window
+	// does with its size while the session runs.
+	sizeMode string
+	// baseW, baseH are the client size the session connected with; fixed
+	// and scale keep the session at it.
+	baseW, baseH int32
+	// baseScale is the desktop scale factor the session was started with; scale
+	// mode keeps the same visual size when the resolution grows.
+	baseScale int32
+	// fixedW, fixedH are the outer size a fixed window is locked to.
+	fixedW, fixedH int32
+	watchdogTicks  int
 
 	restorePlacement win.WINDOWPLACEMENT
 	restoreStyle     uint32
@@ -67,6 +79,23 @@ func applyDisplay(s *hostState) bool {
 	}
 	w, h := clientDesktopSize(s.hwnd)
 	ds, dev := resolveScale(s.hwnd, &s.opt)
+	if s.sizeMode != store.SizeFit {
+		if s.baseW <= 0 || s.baseH <= 0 {
+			// 还没连上，基准尺寸未知，先不动。
+			return true
+		}
+		if s.sizeMode == store.SizeFixed {
+			// 窗口动不了，会话分辨率就停在连接时的大小。
+			w, h, ds = s.baseW, s.baseH, s.baseScale
+		} else {
+			// 分辨率跟窗口走，DPI 同比放大：画面放大，布局还是原来那些窗口那么大。
+			ds = clampI32((100*w+s.baseW/2)/s.baseW, 100, 500)
+			if s.baseScale > 100 {
+				ds = clampI32(ds*s.baseScale/100, 100, 500)
+			}
+		}
+		dev = deviceScaleFor(ds)
+	}
 	if int(w) == s.appliedW && int(h) == s.appliedH && int(ds) == s.appliedScale {
 		return true
 	}
@@ -186,6 +215,11 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		s.everConnected = true
 		printOut("Connected.")
 		logInfo("Connected.")
+		if s.baseW == 0 {
+			s.baseW, s.baseH = clientDesktopSize(s.hwnd)
+			s.baseScale, _ = resolveScale(s.hwnd, &s.opt)
+			logf("会话尺寸基准 %dx%d（size=%s）", s.baseW, s.baseH, s.sizeMode)
+		}
 		if s.opt.Fullscreen {
 			s.host.setFullScreen(true)
 		}
@@ -287,9 +321,16 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
 	case win.WM_SIZE:
 		s.resizeAx()
+		if s.sizeMode == store.SizeFixed {
+			// 固定大小：窗口动不了，画面也不用重设。
+			return 0
+		}
 		win.SetTimer(hwnd, kTimerResize, 400, 0)
 		return 0
 	case win.WM_DPICHANGED:
+		if s.sizeMode == store.SizeFixed {
+			return 0
+		}
 		if r := ptrAt[win.RECT](lParam); r != nil {
 			win.SetWindowPos(hwnd, 0, r.Left, r.Top, r.Right-r.Left, r.Bottom-r.Top,
 				win.SWP_NOZORDER|win.SWP_NOACTIVATE)
@@ -301,6 +342,14 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		return 1
 	case win.WM_GETMINMAXINFO:
 		mmi := ptrAt[win.MINMAXINFO](lParam)
+		if s.sizeMode == store.SizeFixed && s.fixedW > 0 && s.fixedH > 0 {
+			// 固定大小：最小 = 最大，拖不动，也最大化不了。
+			mmi.PtMinTrackSize.X = s.fixedW
+			mmi.PtMinTrackSize.Y = s.fixedH
+			mmi.PtMaxTrackSize.X = s.fixedW
+			mmi.PtMaxTrackSize.Y = s.fixedH
+			return 0
+		}
 		mmi.PtMinTrackSize.X = 480
 		mmi.PtMinTrackSize.Y = 320
 		return 0
@@ -443,6 +492,13 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	defer win.OleUninitialize()
 
 	s := &hostState{opt: opt, jobPath: jobPath, host: newAxHost()}
+	s.sizeMode = store.NormalizeSizeMode(opt.SizeMode)
+	if opt.Fullscreen && s.sizeMode != store.SizeFit {
+		// 全屏就是让画面填满屏幕，和“窗口尺寸固定”冲突：全屏优先。
+		logWarn("全屏模式忽略 size=" + s.sizeMode + "，按跟随屏幕处理")
+		s.sizeMode = store.SizeFit
+	}
+	logf("窗口尺寸模式 %s", s.sizeMode)
 	gHost = s
 
 	x, y, cw, ch := defaultWindowRect(&opt)
@@ -461,9 +517,15 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 		style = win.WS_POPUP | win.WS_VISIBLE
 		show = int32(win.SW_SHOW)
 	}
+	if s.sizeMode == store.SizeFixed {
+		// 固定大小：没有可拖的边框，也没有最大化按钮。
+		style &^= win.WS_THICKFRAME | win.WS_MAXIMIZEBOX
+	}
 
 	rc := win.RECT{Left: x, Top: y, Right: x + cw, Bottom: y + ch}
 	adjustWindowRectEx((*win_Rect)(unsafe.Pointer(&rc)), style, false, exStyle)
+	s.fixedW = int32(rc.Right - rc.Left)
+	s.fixedH = int32(rc.Bottom - rc.Top)
 
 	inst := win.GetModuleHandle(nil)
 	wc := win.WNDCLASSEX{

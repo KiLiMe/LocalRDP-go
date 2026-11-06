@@ -4,6 +4,7 @@ package ui
 
 import (
 	myui "github.com/egoist/mygo/ui"
+	"localrdp/internal/store"
 )
 
 // view builds a frame of the window.
@@ -205,6 +206,11 @@ func (st *State) modeCard(c *myui.Context) {
 func (st *State) optionCard(c *myui.Context) {
 	t := c.Theme()
 	card(c, T("Options"), func() {
+		st.field(c, "size", T("Window size"), func() {
+			st.sizeChoice(c)
+		})
+		myui.Text(c, T("Fixed keeps the window and the desktop at Width × Height; follow lets the window decide; scale keeps the layout while the window grows.")).
+			FontSize(11).TextColor(t.TextMuted).Wrap()
 		myui.Row(c).Gap(16).Wrap().Children(func() {
 			myui.Checkbox(c, &st.Form.FullScreen, T("Full screen"))
 			myui.Checkbox(c, &st.Form.KeepSession, T("Keep session"))
@@ -216,6 +222,22 @@ func (st *State) optionCard(c *myui.Context) {
 		myui.Text(c, T("Privileges")+": "+st.PrivNote).FontSize(11).
 			TextColor(pickColor(t, st.PrivOK, t.TextMuted, t.Warning)).Wrap()
 	})
+}
+
+// sizeChoice is the window-size segmented control: an index in the State
+// kept in step with Form.SizeMode, which is what the child process gets.
+func (st *State) sizeChoice(c *myui.Context) {
+	modes := store.SizeModes()
+	if st.sizeModeSeen != st.Form.SizeMode {
+		st.SizeIndex = store.SizeModeIndex(st.Form.SizeMode)
+		st.sizeModeSeen = st.Form.SizeMode
+	}
+	myui.Segmented(c.Key("size"), &st.SizeIndex,
+		T("Fixed size"), T("Follow window"), T("Scale to fit"))
+	if i := st.SizeIndex; i >= 0 && i < len(modes) && modes[i] != st.Form.SizeMode {
+		st.Form.SizeMode = modes[i]
+		st.sizeModeSeen = modes[i]
+	}
 }
 
 // actions is the row of buttons that act on the console.

@@ -46,6 +46,9 @@ type StartOptions struct {
 	KeepSess   bool
 	Desktop    bool
 	Fullscreen bool
+	// SizeMode is how the window relates to the session resolution: fit
+	// (default), fixed or scale. See store.NormalizeSizeMode.
+	SizeMode string
 }
 
 func defaultOptions() StartOptions {

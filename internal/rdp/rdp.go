@@ -250,14 +250,19 @@ func resolveScale(hwnd win.HWND, opt *StartOptions) (int32, int32) {
 	if pct > 500 {
 		pct = 500
 	}
-	dev := int32(100)
+	return pct, deviceScaleFor(pct)
+}
+
+// deviceScaleFor maps a desktop scale factor onto the device scale factor the
+// session reports back to the guest.
+func deviceScaleFor(pct int32) int32 {
 	switch {
 	case pct >= 200:
-		dev = 180
+		return 180
 	case pct >= 125:
-		dev = 140
+		return 140
 	}
-	return pct, dev
+	return 100
 }
 
 // configure 对应 src/rdp_host.cpp 的 ConfigureControl()。

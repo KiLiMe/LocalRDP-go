@@ -34,6 +34,11 @@ type Session struct {
 	// default of about 5/6 of the monitor.
 	Width  int `json:"width,omitempty"`
 	Height int `json:"height,omitempty"`
+	// SizeMode says what the host window does with its size: SizeFit
+	// (default) lets the window decide the session resolution, SizeFixed
+	// pins both to Width×Height, SizeScale keeps the resolution and scales
+	// the picture into the window.
+	SizeMode string `json:"size_mode,omitempty"`
 	// Title of the host window; empty for the default.
 	Title string `json:"title,omitempty"`
 	// FullScreen, Hidden and Minimized are the window's first state.
@@ -49,6 +54,45 @@ type Session struct {
 // DefaultTimeout is the connection timeout the form offers, as the command
 // line defaults to.
 const DefaultTimeout = 90
+
+// Size modes of the host window, as --size spells them.
+const (
+	// SizeFit lets the window decide: dragging it re-negotiates the
+	// session resolution (the default).
+	SizeFit = "fit"
+	// SizeFixed pins the window and the session to Width×Height, and takes
+	// the resize border away.
+	SizeFixed = "fixed"
+	// SizeScale keeps the session resolution and scales the picture into
+	// the window.
+	SizeScale = "scale"
+)
+
+// SizeModes is the order the form offers the modes in.
+func SizeModes() []string { return []string{SizeFixed, SizeFit, SizeScale} }
+
+// NormalizeSizeMode maps a name from the command line or a settings file to
+// one of the modes; empty and unknown mean SizeFit.
+func NormalizeSizeMode(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case SizeFixed, "fix", "locked", "lock":
+		return SizeFixed
+	case SizeScale, "scaled", "zoom", "stretch":
+		return SizeScale
+	}
+	return SizeFit
+}
+
+// SizeModeIndex is the position of a mode in SizeModes.
+func SizeModeIndex(s string) int {
+	m := NormalizeSizeMode(s)
+	for i, v := range SizeModes() {
+		if v == m {
+			return i
+		}
+	}
+	return 1
+}
 
 // Empty is whether the session holds nothing, so a settings file from an
 // older install does not leave the form blank.
@@ -90,6 +134,9 @@ func (s Session) Args() []string {
 	}
 	if s.Height > 0 {
 		args = append(args, "--height", fmt.Sprint(s.Height))
+	}
+	if m := NormalizeSizeMode(s.SizeMode); m != SizeFit {
+		args = append(args, "--size", m)
 	}
 	if s.Timeout > 0 {
 		args = append(args, "--timeout", fmt.Sprint(s.Timeout))

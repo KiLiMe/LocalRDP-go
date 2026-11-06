@@ -110,6 +110,11 @@ type State struct {
 	WidthText   string
 	HeightText  string
 	TimeoutText string
+	// SizeIndex is the window-size segment chosen, and sizeModeSeen the
+	// Form.SizeMode it was taken from, so a loaded session moves the
+	// segment and a click moves the form.
+	SizeIndex    int
+	sizeModeSeen string
 	// WindowW and WindowH are the window's size, measured by view().
 	WindowW, WindowH float32
 	// Dark is the theme in front, as the window draws it.

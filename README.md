@@ -56,10 +56,11 @@ protocol `2025-06-18`，零第三方依赖），AI 客户端可直接读状态�
 | `desktop` 完整子桌面 | ✅ |
 | `status` / `stop` | ✅ |
 | 窗口缩放 / DPI / 全屏（Ctrl+Alt+F） | ✅（登录后同步显示设置） |
+| 窗口大小三档（固定 / 跟随 / 缩放填充） | ✅ `--size fit\|fixed\|scale` |
 | 文本剪贴板 | ✅（RDP 自带重定向） |
 | `start -- 程序` | ⚠️ 需 `SeTcb` + `SeAssignPrimaryToken` |
 | 文件剪贴板桥 | ⚠️ 同上 |
-| `--scale` | ⚠️ 本机该属性不可用 |
+| `--scale N` | ✅ 桌面按 N% 渲染（见 Q5） |
 
 需要特权时：
 

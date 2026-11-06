@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"localrdp/internal/store"
 	"localrdp/internal/win32"
 )
 
@@ -29,6 +30,9 @@ func printHelp() {
 	printOut("  --height N         Initial window client height")
 	printOut("  --x N --y N        Host window position")
 	printOut("  --scale N          Desktop scale percent 100-500 (default: follow window DPI)")
+	printOut("  --size MODE        fit (default, window decides the resolution), fixed (window and")
+	printOut("                     session keep --width/--height, no resize border), or scale (keep")
+	printOut("                     the resolution, zoom the picture into the window)")
 	printOut("  --fullscreen       Start full screen (Ctrl+Alt+F to toggle)")
 	printOut("  --title TEXT       Host window title")
 	printOut("  --workdir DIR      Working directory for the launched program")
@@ -182,6 +186,29 @@ func Run(args []string) int {
 			return int(ExitOk)
 		}
 		switch strings.ToLower(a) {
+		case "--fixed", "--fixed-size":
+			if !optionsAllowed {
+				return int(ExitError)
+			}
+			opt.SizeMode = store.SizeFixed
+			continue
+		case "--size":
+			if !optionsAllowed || !needValue(i, args, a) {
+				return int(ExitError)
+			}
+			i++
+			switch strings.ToLower(strings.TrimSpace(args[i])) {
+			case "fit", "follow", "follow-window":
+				opt.SizeMode = store.SizeFit
+			case "fixed", "lock", "locked":
+				opt.SizeMode = store.SizeFixed
+			case "scale", "scaled", "zoom":
+				opt.SizeMode = store.SizeScale
+			default:
+				printErr("--size takes fit, fixed or scale, not " + args[i] + ".")
+				return int(ExitError)
+			}
+			continue
 		case "--width":
 			if !optionsAllowed || !parseIntOption(&i, args, &opt.Width) {
 				return int(ExitError)

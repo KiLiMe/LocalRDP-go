@@ -69,6 +69,37 @@ func TestSessionIDFollowsTheProgram(t *testing.T) {
 	}
 }
 
+func TestSessionArgsCarryTheSizeMode(t *testing.T) {
+	args := Session{Width: 1280, Height: 800, SizeMode: SizeFixed}.Args()
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "--size fixed") {
+		t.Fatalf("the size mode is missing from the command line: %v", args)
+	}
+	if got := (Session{Width: 1280, Height: 800}).Args(); strings.Contains(strings.Join(got, " "), "--size") {
+		t.Fatalf("the default mode should not be spelled out: %v", got)
+	}
+}
+
+func TestNormalizeSizeMode(t *testing.T) {
+	cases := map[string]string{
+		"":         SizeFit,
+		"fit":      SizeFit,
+		"FIXED":    SizeFixed,
+		"lock":     SizeFixed,
+		"scale":    SizeScale,
+		" Zoom ":   SizeScale,
+		"nonsense": SizeFit,
+	}
+	for in, want := range cases {
+		if got := NormalizeSizeMode(in); got != want {
+			t.Errorf("NormalizeSizeMode(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if i := SizeModeIndex(SizeFixed); SizeModes()[i] != SizeFixed {
+		t.Fatalf("SizeModeIndex(%q) = %d, which is %q", SizeFixed, i, SizeModes()[i])
+	}
+}
+
 func TestSettingsRoundTrip(t *testing.T) {
 	t.Setenv("LOCALAPPDATA", t.TempDir())
 
