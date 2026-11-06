@@ -3,6 +3,8 @@ package rdp
 import (
 	"strconv"
 	"strings"
+
+	"localrdp/internal/win32"
 )
 
 // eqFold compares two strings ignoring ASCII case, as the verbs of the
@@ -83,6 +85,8 @@ func Run(args []string) int {
 
 	// 不带参数启动 exe 时直接进图形界面（双击即可用）。
 	if len(args) < 2 {
+		// 双击启动会带一个控制台窗口，它会盖在界面后面。
+		win32.FreeConsole()
 		return runGui(nil)
 	}
 	if eqFold(args[1], "-gui") || eqFold(args[1], "--gui") {

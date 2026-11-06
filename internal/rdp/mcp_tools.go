@@ -25,7 +25,6 @@ var (
 const (
 	wtsUserName         = 5
 	th32csSnapProcess   = 0x00000002
-	createNoWindow      = 0x08000000
 	createNewProcessGrp = 0x00000200
 	logReadLimit        = 16 << 20
 	logDefaultLines     = 120

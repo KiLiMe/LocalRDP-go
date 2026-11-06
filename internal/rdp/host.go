@@ -238,7 +238,7 @@ func (s *hostState) startClipBridge() {
 	cmd := buildCommandLine([]string{win32.ExePath(), "--clip-bridge",
 		"--expect-session", win32.Itoa(int(sid)), "--parent-pid", win32.Itoa(int(currentProcessID()))})
 	var pid uint32
-	if !launchInSession(sid, cmd, "", &pid) {
+	if !launchInSession(sid, cmd, "", true, &pid) {
 		logWarn("子会话内剪贴板桥启动失败")
 		return
 	}
@@ -259,7 +259,7 @@ func (s *hostState) startSessionEntry() {
 	cmd := buildCommandLine([]string{win32.ExePath(), "--session-entry",
 		"--job", s.jobPath, "--expect-session", win32.Itoa(int(sid))})
 	var pid uint32
-	if !launchInSession(sid, cmd, "", &pid) {
+	if !launchInSession(sid, cmd, "", true, &pid) {
 		logError("Failed to start the session entry process in the child session.")
 		if !s.opt.Desktop {
 			s.failed = true
@@ -476,6 +476,13 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 		s.fullscreen = true
 	}
 	win.ShowWindow(s.hwnd, show)
+	if show != int32(win.SW_HIDE) && !win.IsWindowVisible(s.hwnd) {
+		// A process started with STARTF_USESHOWWINDOW/SW_HIDE (see
+		// win32.HideWindow) has its very first ShowWindow ignored, which left
+		// the window built but never seen. A second call does show it.
+		win.ShowWindow(s.hwnd, int32(win.SW_SHOW))
+		win.SetForegroundWindow(s.hwnd)
+	}
 	win.UpdateWindow(s.hwnd)
 
 	// 抽干一次消息队列，避免尺寸消息早于控件创建到达。

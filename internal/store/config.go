@@ -75,6 +75,8 @@ func (s Session) Args() []string {
 	}
 	if t := strings.TrimSpace(s.Title); t != "" {
 		args = append(args, "--title", t)
+	} else if label := strings.TrimSpace(s.Label()); label != "" {
+		args = append(args, "--title", label)
 	}
 	if s.Width > 0 {
 		args = append(args, "--width", fmt.Sprint(s.Width))

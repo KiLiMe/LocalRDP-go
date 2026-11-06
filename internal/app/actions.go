@@ -12,6 +12,7 @@ import (
 	"localrdp/internal/i18n"
 	"localrdp/internal/store"
 	"localrdp/internal/ui"
+	"localrdp/internal/win32"
 )
 
 // actions is the App as the interface calls it: every method changes the
@@ -264,8 +265,7 @@ func (a *actions) ShowSession(id string) bool {
 			if !tab.Open {
 				return false
 			}
-			_ = exec.Command("wscript.exe", "//nologo", "//B", "//E:vbscript",
-				scriptFile(a, id)).Start()
+			win32.BringToFront(tab.PID)
 			return true
 		}
 	}
@@ -353,28 +353,6 @@ func (a *App) shutdown() {
 	if a.St.Open {
 		_, _ = runSelf("stop")
 	}
-}
-
-// scriptFile writes the script that brings a child window forward and
-// returns its path.
-func scriptFile(a *actions, id string) string {
-	dir := store.Dir()
-	_ = os.MkdirAll(dir, 0o755)
-	path := dir + `\show-label.vbs`
-	body := `Set s = CreateObject("WScript.Shell")` + "\r\n" +
-		`s.AppActivate "` + escapeVB(a.labelOf(id)) + `"` + "\r\n"
-	_ = os.WriteFile(path, []byte(body), 0o644)
-	return path
-}
-
-// labelOf is the title of the session with that id.
-func (a *actions) labelOf(id string) string {
-	for _, tab := range a.St.Sessions {
-		if tab.Session.ID() == id {
-			return tab.Title
-		}
-	}
-	return ""
 }
 
 // tailLog is the last lines of the log, or nothing when there is none.

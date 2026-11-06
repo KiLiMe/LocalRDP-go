@@ -57,6 +57,7 @@ const (
 	startfUseShowWindow        = 0x00000001
 	createUnicodeEnvironment   = 0x00000400
 	createNewConsole           = 0x00000010
+	createNoWindow             = 0x08000000
 	createBreakawayFromJob     = 0x01000000
 	extendedStartupInfoPresent = 0x00080000
 	procThreadAttributeParent  = 0x00020000
@@ -65,6 +66,17 @@ const (
 	seAssignPrimaryTokenName   = "SeAssignPrimaryTokenPrivilege"
 	seIncreaseQuotaName        = "SeIncreaseQuotaPrivilege"
 )
+
+// launchFlags is what a process started in the child session runs with. Our
+// own helpers get no console: one would open on the child desktop and sit
+// there. A program the user asked for keeps one.
+func launchFlags(hidden bool, extra uint32) uint32 {
+	flags := uint32(createUnicodeEnvironment|createBreakawayFromJob) | extra
+	if hidden {
+		return flags | createNoWindow
+	}
+	return flags | createNewConsole
+}
 
 func scoreProcess(name string) int {
 	switch lower(name) {
@@ -151,7 +163,7 @@ func runProcessWithToken(token syscall.Token, cmdLine, workDir string, flags uin
 	return pi.ProcessID, 0
 }
 
-func launchWithPrimaryToken(token syscall.Token, cmdLine, workDir string, pid *uint32) bool {
+func launchWithPrimaryToken(token syscall.Token, cmdLine, workDir string, hidden bool, pid *uint32) bool {
 	var env uintptr
 	procCreateEnvironmentBlock.Call(uintptr(unsafe.Pointer(&env)), uintptr(token), 0)
 	si := startupInfoEx{}
@@ -160,7 +172,7 @@ func launchWithPrimaryToken(token syscall.Token, cmdLine, workDir string, pid *u
 	si.StartupInfo.Flags = startfUseShowWindow
 	si.StartupInfo.ShowWindow = 1 // SW_SHOWNORMAL
 	id, errno := runProcess(cmdLine, workDir,
-		createUnicodeEnvironment|createNewConsole|createBreakawayFromJob, env, &si, token)
+		launchFlags(hidden, 0), env, &si, token)
 	if id == 0 {
 		// CreateProcessAsUser 需要 SeAssignPrimaryTokenPrivilege（本机管理员令牌里没有），
 		// 退回 CreateProcessWithTokenW —— 它只要 SeImpersonatePrivilege。
@@ -169,7 +181,7 @@ func launchWithPrimaryToken(token syscall.Token, cmdLine, workDir string, pid *u
 			procCreateEnvironmentBlock.Call(uintptr(unsafe.Pointer(&env)), uintptr(token), 0)
 		}
 		id2, errno2 = runProcessWithToken(token, cmdLine, workDir,
-			createUnicodeEnvironment|createNewConsole|createBreakawayFromJob, env, &si)
+			launchFlags(hidden, 0), env, &si)
 		if id2 != 0 {
 			id, errno = id2, 0
 		} else {
@@ -188,7 +200,7 @@ func launchWithPrimaryToken(token syscall.Token, cmdLine, workDir string, pid *u
 	return true
 }
 
-func launchWithWtsToken(sessionID uint32, cmdLine, workDir string, pid *uint32) bool {
+func launchWithWtsToken(sessionID uint32, cmdLine, workDir string, hidden bool, pid *uint32) bool {
 	enablePrivilege(seTcbName)
 	enablePrivilege(seAssignPrimaryTokenName)
 	enablePrivilege(seIncreaseQuotaName)
@@ -203,10 +215,10 @@ func launchWithWtsToken(sessionID uint32, cmdLine, workDir string, pid *uint32) 
 		return false
 	}
 	defer syscall.CloseHandle(syscall.Handle(token))
-	return launchWithPrimaryToken(token, cmdLine, workDir, pid)
+	return launchWithPrimaryToken(token, cmdLine, workDir, hidden, pid)
 }
 
-func launchWithProcessToken(proc syscall.Handle, cmdLine, workDir string, pid *uint32) bool {
+func launchWithProcessToken(proc syscall.Handle, cmdLine, workDir string, hidden bool, pid *uint32) bool {
 	var ptok syscall.Handle
 	if r, _, err := procOpenProcessTokenEx.Call(uintptr(proc), 0x0002|0x0008|0x0001,
 		uintptr(unsafe.Pointer(&ptok))); r == 0 {
@@ -230,10 +242,10 @@ func launchWithProcessToken(proc syscall.Handle, cmdLine, workDir string, pid *u
 		return false
 	}
 	defer syscall.CloseHandle(syscall.Handle(primary))
-	return launchWithPrimaryToken(primary, cmdLine, workDir, pid)
+	return launchWithPrimaryToken(primary, cmdLine, workDir, hidden, pid)
 }
 
-func launchAsChild(parent syscall.Handle, cmdLine, workDir string, pid *uint32) bool {
+func launchAsChild(parent syscall.Handle, cmdLine, workDir string, hidden bool, pid *uint32) bool {
 	var size uintptr
 	procInitProcThreadAttrList.Call(0, 1, 0, uintptr(unsafe.Pointer(&size)))
 	if size == 0 {
@@ -261,7 +273,7 @@ func launchAsChild(parent syscall.Handle, cmdLine, workDir string, pid *uint32) 
 	si.StartupInfo.ShowWindow = 1
 	si.AttributeList = list
 	id, errno := runProcess(cmdLine, workDir,
-		createUnicodeEnvironment|extendedStartupInfoPresent|createNewConsole|createBreakawayFromJob,
+		launchFlags(hidden, extendedStartupInfoPresent),
 		0, &si, 0)
 	if id == 0 {
 		logWarn("CreateProcess (parent attribute) failed: " + formatWin32(errno))
@@ -370,7 +382,8 @@ func openSessionProcess(sessionID uint32) syscall.Handle {
 }
 
 // launchInSession mirrors session_launch.cpp: WTS token → process token → parent attribute.
-func launchInSession(sessionID uint32, command, workDir string, pidOut *uint32) bool {
+// hidden starts the process without a console window of its own.
+func launchInSession(sessionID uint32, command, workDir string, hidden bool, pidOut *uint32) bool {
 	if command == "" || sessionID == kNoSession {
 		return false
 	}
@@ -379,7 +392,7 @@ func launchInSession(sessionID uint32, command, workDir string, pidOut *uint32) 
 			sleepMS(400)
 		}
 		var pid uint32
-		if launchWithWtsToken(sessionID, command, workDir, &pid) && acceptLaunch(sessionID, pid) {
+		if launchWithWtsToken(sessionID, command, workDir, hidden, &pid) && acceptLaunch(sessionID, pid) {
 			if pidOut != nil {
 				*pidOut = pid
 			}
@@ -390,7 +403,7 @@ func launchInSession(sessionID uint32, command, workDir string, pidOut *uint32) 
 			continue
 		}
 		pid = 0
-		if launchWithProcessToken(proc, command, workDir, &pid) && acceptLaunch(sessionID, pid) {
+		if launchWithProcessToken(proc, command, workDir, hidden, &pid) && acceptLaunch(sessionID, pid) {
 			syscall.CloseHandle(proc)
 			if pidOut != nil {
 				*pidOut = pid
@@ -398,7 +411,7 @@ func launchInSession(sessionID uint32, command, workDir string, pidOut *uint32) 
 			return true
 		}
 		pid = 0
-		if launchAsChild(proc, command, workDir, &pid) && acceptLaunch(sessionID, pid) {
+		if launchAsChild(proc, command, workDir, hidden, &pid) && acceptLaunch(sessionID, pid) {
 			syscall.CloseHandle(proc)
 			if pidOut != nil {
 				*pidOut = pid

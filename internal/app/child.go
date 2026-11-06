@@ -36,7 +36,7 @@ func runSelf(args ...string) (string, int) {
 func childCommand(s store.Session, password string) *exec.Cmd {
 	cmd := exec.Command(win32.ExePath(), s.Args()...)
 	cmd.Dir = win32.ExeDir()
-	win32.HideWindow(cmd)
+	win32.NoConsole(cmd)
 	cmd.Env = os.Environ()
 	if password != "" {
 		cmd.Env = append(cmd.Env, store.PasswordEnv+"="+password)
