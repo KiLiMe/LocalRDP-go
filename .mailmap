@@ -1,0 +1,3 @@
+# 让历史里其它身份显示为当前维护者（只影响 log/shortlog/blame 的显示，不改历史哈希）
+KiLiMe <80700107+KiLiMe@users.noreply.github.com> mk <mk@123.com>
+KiLiMe <80700107+KiLiMe@users.noreply.github.com> mk <mk@users.noreply.github.com>
