@@ -69,10 +69,6 @@ func (a *actions) OpenSession() {
 	if password == "" && store.HasSecret() {
 		password = store.LoadSecret()
 	}
-	if s.User != "" && password == "" && store.HasSecret() {
-		// A saved password belongs to the account it was saved for.
-		password = ""
-	}
 	if s.User != "" && password == "" {
 		st.FormErr, st.FormErrOn = ui.T("A password is needed for that account."), "password"
 		a.Invalidate()
@@ -190,19 +186,7 @@ func (a *actions) RefreshStatus() {
 		a.St.SessionID = id
 		a.St.Open = open
 		a.St.PrivOK = priv
-		a.St.PrivNote = privNote()
-		for i := range a.St.Sessions {
-			if open && a.St.Sessions[i].Session.ID() == a.St.Sessions[i].Session.ID() {
-				continue
-			}
-		}
-		if !open {
-			for i := range a.St.Sessions {
-				if a.St.Sessions[i].Open && !a.St.Sessions[i].Open {
-					continue
-				}
-			}
-		}
+		a.St.PrivNote = privNote(priv)
 	})
 	a.appendLog(nonEmptyLines(out))
 }
@@ -241,7 +225,7 @@ func (a *actions) GrantPrivileges() {
 		a.Do(func() {
 			a.St.Busy = false
 			a.St.PrivOK = hasPrivileges()
-			a.St.PrivNote = privNote()
+			a.St.PrivNote = privNote(a.St.PrivOK)
 		})
 		if code != 0 {
 			a.appendLog([]string{ui.T("The script did not finish.") + " (" + strconv.Itoa(code) + ")"})

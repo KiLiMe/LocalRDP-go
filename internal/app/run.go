@@ -48,8 +48,6 @@ func Run(opts Options) int {
 		win.OnClosed(a.shutdown)
 		a.Do(func() {
 			a.St.Open = false
-			a.St.PrivNote = privNote()
-			a.St.PrivOK = hasPrivileges()
 			a.St.Log = tailLog(200)
 		})
 		a.Do((*actions)(a).RefreshStatus)

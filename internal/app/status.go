@@ -35,23 +35,36 @@ func parseSessionID(out string) string {
 	return ""
 }
 
-// hasPrivileges reports whether this account may create a child session,
-// which needs the privileges whoami lists.
+// hasPrivileges reports whether the process token holds both privileges
+// needed to launch a process in the child session, enabled or not.
 func hasPrivileges() bool {
-	cmd := exec.Command("whoami.exe", "/priv")
-	hideWindow(cmd)
-	out, err := cmd.Output()
-	if err != nil {
+	var assign, tcb windows.LUID
+	if windows.LookupPrivilegeValue(nil, utf16Ptr("SeAssignPrimaryTokenPrivilege"), &assign) != nil {
 		return false
 	}
-	text := strings.ToLower(string(out))
-	return strings.Contains(text, "seassignprimarytokenprivilege") &&
-		strings.Contains(text, "setcbprivilege")
+	if windows.LookupPrivilegeValue(nil, utf16Ptr("SeTcbPrivilege"), &tcb) != nil {
+		return false
+	}
+	token := windows.GetCurrentProcessToken()
+	var size uint32
+	if err := windows.GetTokenInformation(token, windows.TokenPrivileges, nil, 0, &size); err != windows.ERROR_INSUFFICIENT_BUFFER {
+		return false
+	}
+	buf := make([]byte, size)
+	if windows.GetTokenInformation(token, windows.TokenPrivileges, &buf[0], size, &size) != nil {
+		return false
+	}
+	var hasAssign, hasTCB bool
+	for _, privilege := range (*windows.Tokenprivileges)(unsafe.Pointer(&buf[0])).AllPrivileges() {
+		hasAssign = hasAssign || privilege.Luid == assign
+		hasTCB = hasTCB || privilege.Luid == tcb
+	}
+	return hasAssign && hasTCB
 }
 
-// privNote is what the window says about the privileges.
-func privNote() string {
-	if hasPrivileges() {
+// privNote is what the window says about the queried privileges.
+func privNote(granted bool) string {
+	if granted {
 		return i18nT("Ready")
 	}
 	return i18nT("Missing")

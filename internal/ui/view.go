@@ -265,7 +265,8 @@ func (st *State) panel(c *myui.Context) {
 		})
 		myui.Column(c).Padding(0, 12, 8, 12).Gap(2).Shrink(0).Children(func() {
 			st.envRow(c, T("Child session"), pickText(st.Open, st.SessionID, T("None")), st.Open)
-			st.envRow(c, T("Cached password"), pickText(storeHasSecret(), T("Saved"), T("Not saved")), storeHasSecret())
+			hasSecret := storeHasSecret()
+			st.envRow(c, T("Cached password"), pickText(hasSecret, T("Saved"), T("Not saved")), hasSecret)
 			st.envRow(c, T("Privileges"), pickText(st.PrivOK, T("Ready"), T("Missing")), st.PrivOK)
 		})
 		myui.Divider(c)
