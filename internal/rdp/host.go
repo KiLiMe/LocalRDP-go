@@ -48,6 +48,7 @@ type hostState struct {
 	launchPID   uint32
 	clipStarted bool
 	discDone    bool
+	discSeen    bool
 }
 
 var gHost *hostState
@@ -157,10 +158,10 @@ func (s *hostState) leaveFullscreen() {
 	logInfo("Fullscreen left")
 }
 
+// requestClose asks for the window to close. It may arrive twice (the user
+// clicked X, and the control then reported the disconnect); the WM_CLOSE
+// handler does the actual work only once.
 func (s *hostState) requestClose() {
-	if s.closing {
-		return
-	}
 	s.closing = true
 	win.PostMessage(s.hwnd, win.WM_CLOSE, 0, 0)
 }
@@ -212,6 +213,12 @@ func (s *hostState) onEvent(id int32, args []variant) {
 			}
 		}
 		logInfo("OnDisconnected " + describeDisconnect(s.discReason, s.extReason))
+		s.discSeen = true
+		if s.everConnected {
+			// 会话被注销/断开了：控件只剩一块白板，把窗口收掉，
+			// 不要留一个既没画面也不退出的空窗口。
+			win.PostMessage(s.hwnd, wmRdpDisconnected, 0, 0)
+		}
 	case 8: // OnEnterFullScreenMode
 		logInfo("OnRequestGoFullScreen")
 		s.enterFullscreen()
@@ -342,23 +349,36 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 			return 0
 		case kTimerQuit:
 			win.KillTimer(hwnd, kTimerQuit)
+			logf("kTimerQuit 兜底退出")
 			// 不调用 DestroyWindow：控件在 WM_DESTROY 里会卡住。直接让消息循环退出。
 			win.PostQuitMessage(0)
 			return 0
 		}
 		return 0
 	case win.WM_CLOSE:
-		logf("WM_CLOSE ever=%v done=%v", s.everConnected, s.discDone)
-		if s.everConnected && !s.discDone {
-			s.discDone = true
-			if s.host.disp != nil {
-				hr := (disp{s.host.disp}).call("Disconnect")
-				logf("Disconnect() hr=%s", formatHr(uint32(hr)))
-			}
-			win.SetTimer(hwnd, kTimerQuit, 2000, 0)
+		logf("WM_CLOSE ever=%v done=%v seen=%v", s.everConnected, s.discDone, s.discSeen)
+		if !s.everConnected {
+			win.DestroyWindow(hwnd)
 			return 0
 		}
-		win.DestroyWindow(hwnd)
+		if s.discSeen || s.discDone {
+			// 断开已经发生（或者是第二次关闭请求）：控件只剩白板，退出。
+			logf("会话已断开，退出窗口")
+			win.PostQuitMessage(0)
+			return 0
+		}
+		s.discDone = true
+		if s.host.disp != nil {
+			hr := (disp{s.host.disp}).call("Disconnect")
+			logf("Disconnect() hr=%s", formatHr(uint32(hr)))
+		}
+		// 正常情况等 OnDisconnected 事件收尾；定时器和下面的 goroutine 只是
+		// 兜底——控件偶尔不上报断开，而窗口定时器在断开后不一定还会触发。
+		win.SetTimer(hwnd, kTimerQuit, 3000, 0)
+		go func(h win.HWND) {
+			sleepMS(2500)
+			win.PostMessage(h, wmRdpDisconnected, 0, 0)
+		}(hwnd)
 		return 0
 	case win.WM_DESTROY:
 		// 只发退出信号；COM 对象在消息循环结束后再释放，
