@@ -27,6 +27,9 @@ func (st *State) sessionView(c *myui.Context) {
 			myui.PrimaryButton(c, T("Show session")).OnClick(func() {
 				st.Act.Do(func() { st.Act.ShowSession(tab.Session.ID()) })
 			})
+			myui.Button(c, T("Reconnect")).Disabled(!tab.Open).OnClick(func() {
+				st.Act.Do(func() { st.Act.ReconnectSession(tab.Session.ID()) })
+			})
 			myui.Button(c, T("Close session")).OnClick(func() {
 				st.Act.Do(func() { st.Act.CloseSession(tab.Session.ID()) })
 			})

@@ -38,8 +38,8 @@ var zh = map[string]string{
 	"Window size":   "窗口大小",
 	"Fixed size":    "固定大小",
 	"Follow window": "跟随窗口",
-	"Scale to fit":  "缩放填充",
-	"Fixed keeps the window and the desktop at Width × Height; follow lets the window decide; scale keeps the layout while the window grows.": "固定：窗口与桌面恒为宽×高，不能拖动；跟随：拖动窗口就重设桌面分辨率，字会变小；缩放：桌面按比例放大，窗口还是原来那么大。",
+	"Scale":         "缩放",
+	"Fixed keeps the window and the desktop at Width × Height; follow lets the window decide; scale keeps the resolution and grows what is on screen.": "固定：窗口与桌面恒为宽×高，不能拖动；跟随：拖动窗口就重设桌面分辨率，字会变小；缩放：分辨率不变，窗口变大时桌面整体放大。",
 	"Full screen":               "全屏",
 	"Keep session":              "保留会话",
 	"Minimized":                 "最小化",
@@ -52,6 +52,13 @@ var zh = map[string]string{
 	"Grant privileges":          "授予特权",
 	"Forget password":           "清理密码",
 	"Open the data folder":      "打开数据目录",
+
+	// The host window's own bar.
+	"Reconnect":    "重连",
+	"Disconnect":   "断开",
+	"Connected":    "已连接",
+	"Disconnected": "已断开",
+	"Connecting…":  "正在连接…",
 
 	// The tab of the session the window opened.
 	"Program":       "程序",

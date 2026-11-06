@@ -7,26 +7,31 @@ import (
 	"unsafe"
 
 	"github.com/lxn/win"
+	"localrdp/internal/i18n"
 	"localrdp/internal/store"
 	"localrdp/internal/win32"
 )
 
 const (
-	kTimerWatchdog = 1
-	kTimerLaunch   = 2
-	kTimerQuit     = 3
-	kTimerResize   = 4
-	kTimerDisplay  = 5
-	kTimerClip     = 6
+	kTimerWatchdog  = 1
+	kTimerLaunch    = 2
+	kTimerQuit      = 3
+	kTimerResize    = 4
+	kTimerDisplay   = 5
+	kTimerClip      = 6
+	kTimerReconnect = 7
 
 	wmRdpDisconnected = win.WM_APP + 1
 	className         = "LocalRDP.Host"
 )
 
 type hostState struct {
-	host    *axHost
-	hwnd    win.HWND
-	axHwnd  win.HWND
+	host   *axHost
+	hwnd   win.HWND
+	axHwnd win.HWND
+	// view is the child window the control lives in: the bar above it belongs
+	// to this process, so the control gets the rest of the window.
+	view    win.HWND
 	opt     StartOptions
 	jobPath string
 
@@ -39,6 +44,8 @@ type hostState struct {
 	extReason     int32
 
 	appliedW, appliedH, appliedScale int
+	// retrying is set while a reconnect is between Disconnect and Connect.
+	retrying bool
 	// sizeMode is store.SizeFit, SizeFixed or SizeScale: what the window
 	// does with its size while the session runs.
 	sizeMode string
@@ -70,7 +77,27 @@ func (s *hostState) resizeAx() {
 		return
 	}
 	w, h := clientDesktopSize(s.hwnd)
-	s.host.resize(w, h)
+	s.placeView(w, h)
+}
+
+// placeView puts the control's window under the bar and says the same thing
+// to the control itself.
+func (s *hostState) placeView(w, h int32) {
+	bar := s.barHeight()
+	h = maxI32(h-bar, 1)
+	if s.view != 0 {
+		win.SetWindowPos(s.view, 0, 0, bar, w, h, win.SWP_NOZORDER|win.SWP_NOACTIVATE)
+	}
+	if s.host != nil {
+		s.host.setRect(0, 0, w, h)
+	}
+}
+
+func maxI32(a, b int32) int32 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func applyDisplay(s *hostState) bool {
@@ -88,8 +115,14 @@ func applyDisplay(s *hostState) bool {
 			// 窗口动不了，会话分辨率就停在连接时的大小。
 			w, h, ds = s.baseW, s.baseH, s.baseScale
 		} else {
-			// 分辨率跟窗口走，DPI 同比放大：画面放大，布局还是原来那些窗口那么大。
-			ds = clampI32((100*w+s.baseW/2)/s.baseW, 100, 500)
+			// 缩放：分辨率锁在连接时的大小，窗口变大就把桌面按比例放大，
+			// 桌面上的窗口布局不变（RDCMan 的 scale to fit 那一路）。
+			ratio := (100*w + s.baseW/2) / s.baseW
+			if alt := (100*h + s.baseH/2) / s.baseH; alt < ratio {
+				ratio = alt
+			}
+			w, h = s.baseW, s.baseH
+			ds = clampI32(ratio, 100, 500)
 			if s.baseScale > 100 {
 				ds = clampI32(ds*s.baseScale/100, 100, 500)
 			}
@@ -169,6 +202,7 @@ func (s *hostState) enterFullscreen() {
 		win.SWP_FRAMECHANGED|win.SWP_NOZORDER)
 	s.resizeAx()
 	win.PostMessage(s.hwnd, win.WM_SIZE, 0, 0)
+	win.InvalidateRect(s.hwnd, nil, true)
 	logInfo("Fullscreen entered")
 }
 
@@ -184,6 +218,7 @@ func (s *hostState) leaveFullscreen() {
 	s.host.setFullScreen(false)
 	s.resizeAx()
 	win.PostMessage(s.hwnd, win.WM_SIZE, 0, 0)
+	win.InvalidateRect(s.hwnd, nil, true)
 	logInfo("Fullscreen left")
 }
 
@@ -215,6 +250,7 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		s.everConnected = true
 		printOut("Connected.")
 		logInfo("Connected.")
+		s.invalidateBar()
 		if s.baseW == 0 {
 			s.baseW, s.baseH = desktopSize(s.hwnd, &s.opt)
 			s.baseScale, _ = resolveScale(s.hwnd, &s.opt)
@@ -225,6 +261,7 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		}
 	case 3: // OnLogin
 		s.loggedIn = true
+		s.invalidateBar()
 		sid := getChildSessionID()
 		printOutf("Logon complete. Child session id=%d", sid)
 		logf("Logon complete. Child session id=%d", sid)
@@ -248,9 +285,12 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		}
 		logInfo("OnDisconnected " + describeDisconnect(s.discReason, s.extReason))
 		s.discSeen = true
-		if s.everConnected {
+		s.loggedIn = false
+		s.invalidateBar()
+		if s.everConnected && !s.retrying {
 			// 会话被注销/断开了：控件只剩一块白板，把窗口收掉，
-			// 不要留一个既没画面也不退出的空窗口。
+			// 不要留一个既没画面也不退出的空窗口。重连时除外，那时
+			// 断开是它自己要求的第一步。
 			win.PostMessage(s.hwnd, wmRdpDisconnected, 0, 0)
 		}
 	case 8: // OnEnterFullScreenMode
@@ -400,6 +440,19 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 			win.KillTimer(hwnd, kTimerResize)
 			applyDisplay(s)
 			return 0
+		case kTimerReconnect:
+			win.KillTimer(hwnd, kTimerReconnect)
+			s.retrying = false
+			s.resetConnection()
+			s.resizeAx()
+			if s.host == nil || !s.host.configure(&s.opt) {
+				logError("重连失败：控件配置出错")
+				printErr("Reconnect failed: the control could not be configured.")
+				return 0
+			}
+			s.host.connect()
+			logInfo("重连：已发出 Connect()")
+			return 0
 		case kTimerQuit:
 			win.KillTimer(hwnd, kTimerQuit)
 			logf("kTimerQuit 兜底退出")
@@ -407,6 +460,24 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 			win.PostQuitMessage(0)
 			return 0
 		}
+		return 0
+	case win.WM_PAINT:
+		var ps win.PAINTSTRUCT
+		hdc := win.BeginPaint(hwnd, &ps)
+		if hdc != 0 {
+			s.drawBar(hdc)
+			win.EndPaint(hwnd, &ps)
+		}
+		return 0
+	case win.WM_LBUTTONDOWN:
+		bx := int32(int16(lParam & 0xFFFF))
+		by := int32(int16((lParam >> 16) & 0xFFFF))
+		if s.barClick(bx, by) {
+			return 0
+		}
+		return win.DefWindowProc(hwnd, msg, wParam, lParam)
+	case wmRdpCommand:
+		s.command(wParam)
 		return 0
 	case win.WM_CLOSE:
 		logf("WM_CLOSE ever=%v done=%v seen=%v", s.everConnected, s.discDone, s.discSeen)
@@ -436,7 +507,7 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	case win.WM_DESTROY:
 		// 只发退出信号；COM 对象在消息循环结束后再释放，
 		// 避免在控件自己的回调栈里 Release 导致卡死。
-		for _, id := range []uintptr{kTimerWatchdog, kTimerLaunch, kTimerQuit, kTimerResize, kTimerDisplay, kTimerClip} {
+		for _, id := range []uintptr{kTimerWatchdog, kTimerLaunch, kTimerQuit, kTimerResize, kTimerDisplay, kTimerClip, kTimerReconnect} {
 			win.KillTimer(hwnd, id)
 		}
 		win.PostQuitMessage(0)
@@ -468,7 +539,7 @@ func defaultWindowRect(opt *StartOptions) (int32, int32, int32, int32) {
 		x = int(wa.Left) + (w-cw)/2
 	}
 	if opt.Height > 0 {
-		ch = opt.Height
+		ch = opt.Height + int(barHeightFor(opt))
 		y = int(wa.Top) + (h-ch)/2
 	}
 	if opt.X != cwUseDefault {
@@ -481,9 +552,21 @@ func defaultWindowRect(opt *StartOptions) (int32, int32, int32, int32) {
 }
 
 // RunRdpSession 对应 src/rdp_host.cpp 的 RunRdpSession()。
+// pickLanguage speaks the language the window is set to: the host runs as a
+// separate process, so it cannot inherit it.
+func pickLanguage() {
+	lang := store.LoadSettings().Lang
+	if lang == "" {
+		lang = i18n.Detect()
+	}
+	i18n.Set(lang)
+}
+
 func RunRdpSession(opt StartOptions, jobPath string) int {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+
+	pickLanguage()
 
 	icc := win.INITCOMMONCONTROLSEX{DwSize: uint32(unsafe.Sizeof(win.INITCOMMONCONTROLSEX{})), DwICC: win.ICC_WIN95_CLASSES}
 	win.InitCommonControlsEx(&icc)
@@ -579,8 +662,16 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	}
 
 	var created bool
+	// 控件住在一个子窗口里：上面的栏是本进程画的，控件只管栏下面那块。
+	bar := barHeightFor(&opt)
+	s.view = win.CreateWindowEx(0, win32.UTF16Ptr("STATIC"), nil,
+		win.WS_CHILD|win.WS_VISIBLE|win.WS_CLIPCHILDREN|win.WS_CLIPSIBLINGS,
+		0, bar, cw, ch-bar, s.hwnd, 0, inst, nil)
+	if s.view == 0 {
+		logWarn("创建控件容器失败: " + formatWin32(uint32(win.GetLastError())))
+	}
 	for i := range clsidRdpClients {
-		if err := s.host.create(&clsidRdpClients[i], s.hwnd); err != nil {
+		if err := s.host.create(&clsidRdpClients[i], s.view); err != nil {
 			logWarn("创建 RDP 控件失败: " + err.Error())
 			continue
 		}

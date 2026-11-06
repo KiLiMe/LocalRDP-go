@@ -240,6 +240,10 @@ func clientDesktopSize(hwnd win.HWND) (int32, int32) {
 // --minimized reports 0x0, and the session would open at 200x200.
 func desktopSize(hwnd win.HWND, opt *StartOptions) (int32, int32) {
 	w, h := clientDesktopSize(hwnd)
+	if h > 0 {
+		// The host window keeps a bar at the top; the session gets the rest.
+		h -= barHeightFor(opt)
+	}
 	if w >= 480 && h >= 320 {
 		return w, h
 	}

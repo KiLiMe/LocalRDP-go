@@ -34,6 +34,7 @@ var (
 	procGetWindowThreadProcessID = user32.NewProc("GetWindowThreadProcessId")
 	procGetClassNameW            = user32.NewProc("GetClassNameW")
 	procShowWindow               = user32.NewProc("ShowWindow")
+	procPostMessageW             = user32.NewProc("PostMessageW")
 	procSetForegroundWindow      = user32.NewProc("SetForegroundWindow")
 	procSwitchToThisWindow       = user32.NewProc("SwitchToThisWindow")
 	procFindWindowW              = user32.NewProc("FindWindowW")
@@ -98,12 +99,49 @@ func rebind(id int, name, label string) {
 	}
 }
 
+// The commands the host window takes through PostCommand: the same numbers
+// its bar's buttons press.
+const (
+	HostCommandMessage = 0x8000 + 2 // WM_APP + 2
+	CmdReconnect       = 1
+	CmdDisconnect      = 2
+	CmdFullScreen      = 3
+)
+
 // BringToFront shows and focuses the host window of a child process. The
 // process is named instead of the title, because two sessions can share one.
 func BringToFront(pid int) bool {
 	if pid <= 0 {
 		return false
 	}
+	found := findHostWindow(pid)
+	if found == 0 {
+		return false
+	}
+	procShowWindow.Call(found, swRestore)
+	procSetForegroundWindow.Call(found)
+	// Windows often refuses SetForegroundWindow to a process that is not in
+	// front already; SwitchToThisWindow still brings the window up.
+	procSwitchToThisWindow.Call(found, 1)
+	return true
+}
+
+// PostCommand asks the host window of a child process to do something: the
+// interface's buttons work that way, without the child's cooperation.
+func PostCommand(pid int, cmd uintptr) bool {
+	if pid <= 0 {
+		return false
+	}
+	found := findHostWindow(pid)
+	if found == 0 {
+		return false
+	}
+	procPostMessageW.Call(found, uintptr(HostCommandMessage), cmd, 0)
+	return true
+}
+
+// findHostWindow is the host window of that process, or 0.
+func findHostWindow(pid int) uintptr {
 	target := uint32(pid)
 	var found uintptr
 	cb := syscall.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
@@ -121,15 +159,7 @@ func BringToFront(pid int) bool {
 		return 0
 	})
 	procEnumWindows.Call(cb, 0)
-	if found == 0 {
-		return false
-	}
-	procShowWindow.Call(found, swRestore)
-	procSetForegroundWindow.Call(found)
-	// Windows often refuses SetForegroundWindow to a process that is not in
-	// front already; SwitchToThisWindow still brings the window up.
-	procSwitchToThisWindow.Call(found, 1)
-	return true
+	return found
 }
 
 // HostClassName is the window class of the remote desktop host window.

@@ -56,7 +56,8 @@ protocol `2025-06-18`，零第三方依赖），AI 客户端可直接读状态�
 | `desktop` 完整子桌面 | ✅ |
 | `status` / `stop` | ✅ |
 | 窗口缩放 / DPI / 全屏（Ctrl+Alt+F） | ✅（登录后同步显示设置） |
-| 窗口大小三档（固定 / 跟随 / 缩放填充） | ✅ `--size fit\|fixed\|scale` |
+| 会话窗口顶栏：全屏 / 重连 / 断开 | ✅ 自绘 36px 栏，重连不关窗口 |
+| 窗口大小三档（固定 / 跟随 / 缩放） | ✅ `--size fit\|fixed\|scale` |
 | 文本剪贴板 | ✅（RDP 自带重定向） |
 | `start -- 程序` | ⚠️ 需 `SeTcb` + `SeAssignPrimaryToken` |
 | 文件剪贴板桥 | ⚠️ 同上 |
@@ -74,7 +75,7 @@ pwsh .\install-privileges.ps1     # 管理员，自动提权
 ```text
 main.go                入口：os.Exit(rdp.Run(os.Args))
 
-internal/rdp/          package rdp：命令行、宿主、COM 容器、会话启动
+internal/rdp/          package rdp：命令行、宿主（host.go + bar.go 顶栏）、COM 容器、会话启动
   run.go               命令行解析 / 分发 / help
   gui_shim.go          GUI 开关解析，交给 internal/app
   host.go              宿主窗口、消息循环、定时器、全屏、断线

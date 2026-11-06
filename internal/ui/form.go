@@ -183,7 +183,7 @@ func (st *State) optionCard(c *myui.Context) {
 		st.field(c, "size", T("Window size"), func() {
 			st.sizeChoice(c)
 		})
-		myui.Text(c, T("Fixed keeps the window and the desktop at Width × Height; follow lets the window decide; scale keeps the layout while the window grows.")).
+		myui.Text(c, T("Fixed keeps the window and the desktop at Width × Height; follow lets the window decide; scale keeps the resolution and grows what is on screen.")).
 			FontSize(11).TextColor(t.TextMuted).Wrap()
 		myui.Row(c).Gap(16).Wrap().Children(func() {
 			myui.Checkbox(c, &st.Form.FullScreen, T("Full screen"))
@@ -207,7 +207,7 @@ func (st *State) sizeChoice(c *myui.Context) {
 		st.sizeModeSeen = st.Form.SizeMode
 	}
 	myui.Segmented(c.Key("size"), &st.SizeIndex,
-		T("Fixed size"), T("Follow window"), T("Scale to fit"))
+		T("Fixed size"), T("Follow window"), T("Scale"))
 	if i := st.SizeIndex; i >= 0 && i < len(modes) && modes[i] != st.Form.SizeMode {
 		st.Form.SizeMode = modes[i]
 		st.sizeModeSeen = modes[i]

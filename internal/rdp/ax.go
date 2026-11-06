@@ -97,13 +97,16 @@ type controlSiteVtbl struct {
 var noInitNew = true
 
 type axHost struct {
-	cs      clientSite
-	ips     inPlaceSite
-	ipf     inPlaceFrame
-	ev      evSink
-	ipsEx   inPlaceSiteEx
-	ctl     controlSite
-	hwnd    win.HWND
+	cs    clientSite
+	ips   inPlaceSite
+	ipf   inPlaceFrame
+	ev    evSink
+	ipsEx inPlaceSiteEx
+	ctl   controlSite
+	hwnd  win.HWND
+	// top is where the control starts inside the window: the host keeps a
+	// bar above it, so the control does not begin at y = 0.
+	top     int32
 	ctrl    unsafe.Pointer // 控件自身 IUnknown，对应 C++ 的 st->control
 	ole     *win.IOleObject
 	ipo     *win.IOleInPlaceObject
@@ -273,6 +276,12 @@ func ipsGetWindowContext(self *inPlaceSite, frame **inPlaceFrame, doc *unsafe.Po
 	pos, clip *win.RECT, info *win.OLEINPLACEFRAMEINFO) uintptr {
 	*frame = &self.h.ipf
 	*doc = nil
+	if pos != nil {
+		*pos = self.h.inearRect()
+	}
+	if clip != nil {
+		*clip = self.h.inearRect()
+	}
 	if info != nil {
 		info.Cb = uint32(unsafe.Sizeof(win.OLEINPLACEFRAMEINFO{}))
 		info.FMDIApp = win.FALSE
@@ -290,11 +299,9 @@ func ipsDiscardUndoState(self *inPlaceSite) uintptr                  { return hr
 func ipsDeactivateAndUndo(self *inPlaceSite) uintptr                 { return hrNotImpl }
 
 func ipsOnPosRectChange(self *inPlaceSite, rc *win.RECT) uintptr {
-	ipo := self.h.ipo
-	if ipo == nil {
-		return hrOK
-	}
-	return uintptr(ipo.SetObjectRects(rc, rc))
+	// 控件想自己决定位置：它是照容器矩形算的，会把上面的栏盖掉。
+	// 位置由 resize()/setRect() 统一给，这里只认下，不照做。
+	return hrOK
 }
 
 // ---------------------------------------------------------------- in place frame
@@ -552,11 +559,28 @@ func (h *axHost) release() {
 }
 
 func (h *axHost) resize(width, height int32) {
+	h.setRect(0, 0, width, height)
+}
+
+// setRect puts the control at a place of the window's client area: the host
+// keeps a bar at the top, so the control does not start at 0,0.
+func (h *axHost) setRect(x, y, width, height int32) {
+	h.top = y
 	if h.ipo == nil {
 		return
 	}
-	rc := win.RECT{Right: width, Bottom: height}
+	rc := win.RECT{Left: x, Top: y, Right: x + width, Bottom: y + height}
 	h.ipo.SetObjectRects(&rc, &rc)
+}
+
+// inearRect is the place the control may use: the window's client area under
+// the bar.
+func (h *axHost) inearRect() win.RECT {
+	var rc win.RECT
+	if h.hwnd != 0 {
+		win.GetClientRect(h.hwnd, &rc)
+	}
+	return win.RECT{Left: 0, Top: h.top, Right: rc.Right, Bottom: rc.Bottom}
 }
 
 func (h *axHost) disconnect() {

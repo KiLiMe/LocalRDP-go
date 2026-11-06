@@ -259,6 +259,22 @@ func (a *actions) ShowSession(id string) bool {
 	return false
 }
 
+// ReconnectSession asks a running session's window to connect again: the
+// same buttons the window's own bar has, pressed from here.
+func (a *actions) ReconnectSession(id string) bool {
+	for _, tab := range a.St.Sessions {
+		if tab.Session.ID() != id || !tab.Open {
+			continue
+		}
+		if !win32.PostCommand(tab.PID, win32.CmdReconnect) {
+			return false
+		}
+		a.appendLog([]string{"Reconnecting " + tab.Label() + "…"})
+		return true
+	}
+	return false
+}
+
 // CloseSession ends one and drops its tab.
 func (a *actions) CloseSession(id string) {
 	target := -1

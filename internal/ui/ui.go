@@ -33,6 +33,8 @@ type Actions interface {
 	OpenDataFolder()
 	// ShowSession brings a session's window up.
 	ShowSession(id string) bool
+	// ReconnectSession asks a session's window to connect again.
+	ReconnectSession(id string) bool
 	// CloseSession ends one and closes its tab.
 	CloseSession(id string)
 	// ClearLog drops the log the window shows.

@@ -7,6 +7,7 @@ import (
 
 // view builds a frame of the window.
 func (st *State) view(c *myui.Context) {
+	st.formNumbers()
 	st.Dark = c.Theme().Dark
 	st.WindowW, st.WindowH = c.Size()
 	myui.Column(c).Fill().Children(func() {
