@@ -77,6 +77,9 @@ app/    窗口逻辑：动作、子进程管理、状态刷新、日志跟随
 
 脚本：`localrdp.cmd` / `localrdp-ui.ps1` / `install-privileges.ps1` / `build.ps1`
 
+CI：`.github/workflows/ci.yml` 在 `windows-latest` 上跑 `go vet` / `gofmt -l` / `go test` / `go build`，
+push 与 PR 都触发。
+
 ## 许可
 
 基于 [charles-cty/LocalRDP](https://github.com/charles-cty/LocalRDP)（MIT）重写，见 `LICENSE`。
