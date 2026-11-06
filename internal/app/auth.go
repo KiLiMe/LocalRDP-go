@@ -18,7 +18,7 @@ func installAuth(st *ui.State) {
 // opens with what was left rather than a default.
 func firstInstall(st *ui.State) {
 	s := st.Settings
-	if s.Last.Mode == "" {
+	if s.Last.Empty() {
 		s.Remember = true
 		s.Last = st.Form
 		_ = store.SaveSettings(s)

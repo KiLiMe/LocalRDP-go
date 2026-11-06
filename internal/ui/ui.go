@@ -106,17 +106,13 @@ type State struct {
 	// Busy is whether a child process runs, so the buttons wait for it.
 	Busy bool
 
-	// modeIndex is the segment the mode card shows, and the text fields
-	// that are not part of the form are the numbers, kept as typed so a
-	// half-written number does not turn into a zero.
-	modeIndex   int
+	// WidthText, HeightText and TimeoutText are the numbers, kept as
+	// typed so a half-written number does not turn into a zero.
 	WidthText   string
 	HeightText  string
 	TimeoutText string
 	// WindowW and WindowH are the window's size, measured by view().
 	WindowW, WindowH float32
-	// ModeText is the mode the form last asked for, as the badge shows it.
-	ModeText string
 	// Dark is the theme in front, as the window draws it.
 	Dark bool
 	// quitting is set once the window has decided to close, so the

@@ -81,7 +81,7 @@ func captureSoon(win *mygo.Window, file string) {
 // the settings say to remember it.
 func startupSession() (store.Session, bool) {
 	settings := store.LoadSettings()
-	if settings.Remember && settings.Last.Mode != "" {
+	if settings.Remember && !settings.Last.Empty() {
 		s := settings.Last
 		if s.Width <= 0 {
 			s.Width = store.DefaultWidth

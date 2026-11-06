@@ -361,14 +361,13 @@ func mcpTools() []mcp.Tool {
 }
 
 // mcpLaunch builds the command line for desktop/start and starts it detached.
+// A program rides on the desktop: the session outlives it.
 func mcpLaunch(args map[string]any, start bool) (string, error) {
 	cmd := []string{"desktop"}
 	if start {
-		prog := mcp.ArgString(args, "program", "")
-		if prog == "" {
+		if mcp.ArgString(args, "program", "") == "" {
 			return "", errString("program is required")
 		}
-		cmd = []string{"start"}
 	}
 	if user := mcp.ArgString(args, "user", ""); user != "" {
 		cmd = append(cmd, "--user", user)

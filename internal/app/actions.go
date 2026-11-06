@@ -38,11 +38,7 @@ func (a *actions) validate() (store.Session, bool) {
 	s.Program = strings.TrimSpace(s.Program)
 	s.User = strings.TrimSpace(s.User)
 	s.Title = strings.TrimSpace(s.Title)
-	s.Mode = st.FormMode()
-	if s.Mode == "start" && s.Program == "" {
-		st.FormErr, st.FormErrOn = ui.T("A program is needed for a start session."), "program"
-		return s, false
-	}
+	s.Mode = "desktop"
 	if s.Timeout < 5 {
 		st.FormErr, st.FormErrOn = ui.T("The timeout is at least 5 seconds."), "timeout"
 		return s, false

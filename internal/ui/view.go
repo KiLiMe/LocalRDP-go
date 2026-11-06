@@ -190,22 +190,17 @@ func (st *State) windowCard(c *myui.Context) {
 	})
 }
 
-// modeCard is what the child session runs: the whole desktop, or one
-// program.
+// sessionCard is what the child session runs: the desktop, and the program
+// that starts on it once it connects.
 func (st *State) modeCard(c *myui.Context) {
 	t := c.Theme()
 	card(c, T("Session"), func() {
-		myui.Row(c).Gap(4).Children(func() {
-			myui.Segmented(c.Key("mode"), &st.modeIndex, T("Desktop"), T("Start"))
+		st.field(c, "program", T("Run a program"), func() {
+			myui.TextInput(c.Key("program"), &st.Form.Program).
+				Placeholder(T("Program and arguments, as a command line"))
 		})
-		if st.FormMode() == "start" {
-			st.field(c, "program", T("Program"), func() {
-				myui.TextInput(c.Key("program"), &st.Form.Program).
-					Placeholder(T("Program and arguments, as a command line"))
-			})
-		} else {
-			myui.Text(c, T("desktop — the whole child desktop")).FontSize(11).TextColor(t.TextMuted).Wrap()
-		}
+		myui.Text(c, T("Starts in the child session once it connects. Leave it empty for the desktop alone.")).
+			FontSize(11).TextColor(t.TextMuted).Wrap()
 	})
 }
 

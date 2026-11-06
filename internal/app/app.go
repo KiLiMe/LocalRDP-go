@@ -39,7 +39,6 @@ func newApp(session store.Session, opts Options) *App {
 	st.TimeoutText = win32.Itoa(session.Timeout)
 	st.WidthText = win32.Itoa(session.Width)
 	st.HeightText = win32.Itoa(session.Height)
-	st.SetMode(session.Mode)
 	st.Sessions = opts.Sessions
 	st.Active = opts.Active
 	if st.Settings.Lang == "" {

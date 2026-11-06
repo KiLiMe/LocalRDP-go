@@ -22,8 +22,10 @@ type Session struct {
 	// Name is the session as this desktop sees it: "Desktop" for the whole
 	// child desktop, "Notepad" for a program.
 	Name string `json:"name"`
-	// Mode is "desktop" or "start", the verbs of the command line.
-	Mode string `json:"mode"`
+	// Mode is the verb of earlier versions: the window always opens the
+	// child desktop now, and Program starts on it. Kept so a settings file
+	// from before still reads.
+	Mode string `json:"mode,omitempty"`
 	// Program is the command line start runs, empty for desktop.
 	Program string `json:"program,omitempty"`
 	// User is the account of the child session, as DOMAIN\user.
@@ -48,6 +50,12 @@ type Session struct {
 // line defaults to.
 const DefaultTimeout = 90
 
+// Empty is whether the session holds nothing, so a settings file from an
+// older install does not leave the form blank.
+func (s Session) Empty() bool {
+	return s.Mode == "" && s.Name == "" && s.Program == "" && s.User == "" && s.Title == ""
+}
+
 // Label is the session as the window names it.
 func (s Session) Label() string {
 	if strings.TrimSpace(s.Name) == "" {
@@ -59,17 +67,16 @@ func (s Session) Label() string {
 // ID names the session, the same for the same program and account, so the
 // window knows which row is open.
 func (s Session) ID() string {
-	return strings.ToLower(s.Mode + "|" + strings.TrimSpace(s.Program) + "|" + strings.ToLower(s.User))
+	return strings.ToLower(strings.TrimSpace(s.Program) + "|" + strings.ToLower(s.User))
 }
 
 // Args is the command line the session runs, as the child process gets it:
 // no password, which travels in the environment.
+//
+// The verb is always desktop: the window shows the child desktop, and the
+// program, when there is one, starts on it and leaves it up when it exits.
 func (s Session) Args() []string {
-	mode := s.Mode
-	if mode != "start" {
-		mode = "desktop"
-	}
-	args := []string{mode}
+	args := []string{"desktop"}
 	if s.User != "" {
 		args = append(args, "--user", s.User, "--password-env", PasswordEnv)
 	}
@@ -99,9 +106,9 @@ func (s Session) Args() []string {
 	if s.KeepSession {
 		args = append(args, "--keep-session")
 	}
-	if mode == "start" {
+	if p := strings.TrimSpace(s.Program); p != "" {
 		args = append(args, "--")
-		args = append(args, SplitCommandLine(s.Program)...)
+		args = append(args, SplitCommandLine(p)...)
 	}
 	return args
 }
@@ -204,7 +211,7 @@ func LoadSettings() Settings {
 	if s.Lang == "" {
 		s.Lang = d.Lang
 	}
-	if s.Last.Mode == "" {
+	if s.Last.Empty() {
 		s.Last = d.Last
 	}
 	if s.Last.Timeout == 0 {
