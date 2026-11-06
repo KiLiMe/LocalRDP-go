@@ -1,10 +1,10 @@
 #Requires -Version 7.0
 <#
   LocalRDP 一键启动器
-    .\一键启动.cmd                 -> 菜单
-    pwsh .\一键启动.ps1 desktop    -> 直接开子桌面
-    pwsh .\一键启动.ps1 start pwsh -> 在子会话里跑 pwsh
-    pwsh .\一键启动.ps1 status|stop|setup|shortcut
+    .\localrdp.cmd                  -> 菜单
+    pwsh .\localrdp-ui.ps1 desktop  -> 直接开子桌面
+    pwsh .\localrdp-ui.ps1 start pwsh -> 在子会话里跑 pwsh
+    pwsh .\localrdp-ui.ps1 status|stop|setup|build|shortcut
   密码用 DPAPI(当前用户) 加密缓存到 %LOCALAPPDATA%\LocalRDP\cred.dat，可用 -Forget 清除。
 #>
 [CmdletBinding()]
@@ -37,8 +37,8 @@ function Title([string]$t) {
 function Ensure-Exe {
     if (Test-Path -LiteralPath $Exe) { return $true }
     Say '  未找到 localrdp.exe，开始编译…' 'Yellow'
-    if (-not (Get-Command cmake.exe -ErrorAction SilentlyContinue)) {
-        Say '  找不到 cmake.exe，请先安装 CMake 与 VS2022。' 'Red'; return $false
+    if (-not (Get-Command go.exe -ErrorAction SilentlyContinue)) {
+        Say '  找不到 go.exe，请先安装 Go 1.27+。' 'Red'; return $false
     }
     Push-Location $Root
     try { & (Join-Path $Root 'build.ps1') | Out-Host } finally { Pop-Location }
@@ -160,7 +160,7 @@ function New-Shortcut {
     $desktop = [Environment]::GetFolderPath('Desktop')
     $lnk = Join-Path $desktop 'LocalRDP 子桌面.lnk'
     $sh = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-    $sh.TargetPath       = (Join-Path $Root '一键启动.cmd')
+    $sh.TargetPath       = (Join-Path $Root 'localrdp.cmd')
     $sh.WorkingDirectory = $Root
     $sh.IconLocation     = "$env:SystemRoot\System32\mstsc.exe,0"
     $sh.Description      = 'LocalRDP：本机 loopback 子会话桌面'

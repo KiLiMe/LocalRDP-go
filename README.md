@@ -4,7 +4,7 @@
 通过非公开属性 `ConnectToChildSession` 直接连进 child session，得到一个**带 Explorer 的
 完整第二桌面**，可以和当前桌面用 Alt+Tab 互相切换。
 
-- 纯 Go，无 MSVC / CMake / ATL 依赖，`go build` 产出单文件 exe（约 2.2 MB）
+- 纯 Go，无 MSVC / CMake / ATL 依赖，`go build` 产出单文件 exe（约 10 MB）
 - ActiveX 宿主、事件 sink、DISPATCH 封装全部自写
 - 只有 `desktop` 需要零特权；`start -- 程序` 需要一次性授予两个账户特权
 
@@ -20,7 +20,7 @@ go build -trimpath -ldflags '-s -w' -o build\bin\Release\localrdp.exe .
 .\build\bin\Release\localrdp.exe stop
 ```
 
-`localrdp-ui.ps1` 在找不到 exe 时会自动执行上面的 `go build`。
+`localrdp-ui.ps1` 在找不到 exe 时调用 `build.ps1` 编译（等价于上面的 `go build`）。
 
 ## 能力矩阵
 
@@ -44,18 +44,38 @@ pwsh .\install-privileges.ps1     # 管理员，自动提权
 ## 目录
 
 ```text
-main.go            命令行 / 分发
-host.go            宿主窗口、消息循环、定时器、全屏、断线
-ax.go              ActiveX 容器（站点 + 事件 sink）
-rdp.go             IMsRdpClient* 配置、显示同步、断开文案
-dispatch.go        IDispatch / VARIANT / DISPPARAMS
-env.go             环境探测、status
-session_launch.go  把进程放进指定会话（三条回退路径）
-session_entry.go   子会话内自举入口
-clip_bridge.go     CF_HDROP 文件桥
-job.go log.go common.go winutil.go misc.go
-localrdp.cmd / localrdp-ui.ps1 / install-privileges.ps1
+main.go                入口：os.Exit(rdp.Run(os.Args))
+
+internal/rdp/          package rdp：命令行、宿主、COM 容器、会话启动
+  run.go               命令行解析 / 分发 / help
+  gui_shim.go          GUI 开关解析，交给 internal/app
+  host.go              宿主窗口、消息循环、定时器、全屏、断线
+  ax.go                ActiveX 容器（站点 + 事件 sink）
+  rdp.go               IMsRdpClient* 配置、显示同步、断开文案
+  dispatch.go          IDispatch / VARIANT / DISPPARAMS
+  env.go               环境探测、status
+  session_launch.go    把进程放进指定会话（三条回退路径）
+  session_entry.go     子会话内自举入口
+  clip_bridge.go       CF_HDROP 文件桥
+  start.go             start / stop 命令
+  job.go log.go common.go winutil.go misc.go ptr.go
+
+internal/win32/        app 与 rdp 共用的小工具：Hidden/HideWindow、ExePath/ExeDir、
+                       UTF16Ptr、Itoa —— 两边不再各写一份
 ```
+
+`internal/`（分层，自底向上依赖）：
+
+```text
+win32/  纯 Win32 小工具，无依赖
+rdp/    命令行与 RDP 宿主；只有 gui_shim.go 向上调 app 开窗口，其余不依赖 app/ui
+i18n/   英文文案 → 中文映射；缺条目回落英文，缺口可见
+store/  设置、记住的会话、DPAPI 加密密码（叶子包，不依赖其它内部包）
+ui/     窗口绘制：标题栏、菜单、控制台表单、会话栏、日志（只读 State）
+app/    窗口逻辑：动作、子进程管理、状态刷新、日志跟随
+```
+
+脚本：`localrdp.cmd` / `localrdp-ui.ps1` / `install-privileges.ps1` / `build.ps1`
 
 ## 许可
 
