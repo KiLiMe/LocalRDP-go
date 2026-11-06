@@ -1,7 +1,17 @@
 module localrdp
 
-go 1.27
+go 1.27.3
 
-require github.com/lxn/win v0.0.0-20210218163916-a377121e959e
+require (
+	github.com/egoist/mygo v0.7.4
+	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
+	golang.org/x/sys v0.48.0
+)
 
-require golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13 // indirect
+require (
+	github.com/ebitengine/purego v0.11.1 // indirect
+	github.com/go-text/typesetting v0.3.5 // indirect
+	golang.org/x/image v0.46.0 // indirect
+	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+)

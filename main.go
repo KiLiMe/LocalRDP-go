@@ -17,6 +17,7 @@ func printHelp() {
 	printOut("  localrdp start [options] -- <program> [args...]")
 	printOut("  localrdp desktop [options] [-- <program> [args...]]")
 	printOut("  localrdp stop")
+	printOut("  localrdp gui [options]")
 	printOut("  localrdp help")
 	printOut("")
 	printOut("Options (start / desktop):")
@@ -37,6 +38,10 @@ func printHelp() {
 	printOut("  --drives           Request RDP drive mapping (\\\\tsclient); often unused on loopback")
 	printOut("  --view-only        Ignore local keyboard and mouse in the host window")
 	printOut("  --keep-session     Do not log off the child session when the host exits")
+	printOut("")
+	printOut("Options (gui):")
+	printOut("  -capture FILE      Write a PNG of the window there and quit")
+
 	printOut("")
 	printOut("The child session is the same Windows account as this process. It is not a")
 	printOut("security boundary: files, tokens and installed apps are shared.")
@@ -70,6 +75,13 @@ func main() {
 	logInit()
 
 	args := os.Args
+	// 不带参数启动 exe 时直接进图形界面（双击即可用）。
+	if len(args) < 2 {
+		os.Exit(runGui(nil))
+	}
+	if eqFold(args[1], "-gui") || eqFold(args[1], "--gui") {
+		os.Exit(runGui(args[2:]))
+	}
 	if len(args) >= 2 && eqFold(args[1], "--session-entry") {
 		job := ""
 		expect := uint32(kNoSession)
@@ -111,10 +123,6 @@ func main() {
 		return
 	}
 
-	if len(args) < 2 {
-		printHelp()
-		return
-	}
 	if eqFold(args[1], "-h") || eqFold(args[1], "--help") || eqFold(args[1], "/?") {
 		printHelp()
 		return
@@ -124,8 +132,11 @@ func main() {
 		return
 	}
 
-	opt := defaultOptions()
 	verb := args[1]
+	if eqFold(verb, "gui") || eqFold(verb, "ui") {
+		os.Exit(runGui(args[2:]))
+	}
+	opt := defaultOptions()
 	var programArgs []string
 	afterDash := false
 	optionsAllowed := eqFold(verb, "start") || eqFold(verb, "desktop")
@@ -294,6 +305,8 @@ func main() {
 		os.Exit(int(ExitError))
 	case eqFold(verb, "stop"):
 		os.Exit(cmdStop())
+	case eqFold(verb, "gui"), eqFold(verb, "ui"):
+		os.Exit(runGui(nil))
 	case eqFold(verb, "desktop"):
 		opt.Desktop = true
 		opt.Command = splitCommand(programArgs)
