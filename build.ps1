@@ -34,7 +34,7 @@ try {
         & go test ./...
         if ($LASTEXITCODE -ne 0) { Write-Host '  [ERR] 测试失败。' -ForegroundColor Red; exit $LASTEXITCODE }
     }
-    & go build -trimpath -ldflags '-s -w' -o $Exe .
+    & go build -trimpath -ldflags '-s -w -H=windowsgui' -o $Exe .
     if ($LASTEXITCODE -ne 0) { Write-Host '  [ERR] 编译失败。' -ForegroundColor Red; exit $LASTEXITCODE }
 } finally {
     Pop-Location

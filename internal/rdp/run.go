@@ -85,9 +85,14 @@ func Run(args []string) int {
 
 	// 不带参数启动 exe 时直接进图形界面（双击即可用）。
 	if len(args) < 2 {
-		// 双击启动会带一个控制台窗口，它会盖在界面后面。
+		// 编译成图形子系统的 exe 本来就没有控制台；控制台子系统的开发
+		// 构建会带一个，这里顺手丢攒掉。
 		win32.FreeConsole()
 		return runGui(nil)
+	}
+	// 图形子系统的 exe 从终端里跑时，把输出接回那个终端。
+	if win32.AttachStdio() {
+		logInfo("stdio 接到父进程的控制台")
 	}
 	if eqFold(args[1], "-gui") || eqFold(args[1], "--gui") {
 		return runGui(args[2:])

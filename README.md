@@ -13,12 +13,16 @@
 ## 快速开始
 
 ```pwsh
-go build -trimpath -ldflags '-s -w' -o build\bin\Release\localrdp.exe .
+go build -trimpath -ldflags '-s -w -H=windowsgui' -o build\bin\Release\localrdp.exe .
 .\localrdp.cmd                     # 菜单（推荐）
 .\build\bin\Release\localrdp.exe status
 .\build\bin\Release\localrdp.exe desktop --user "$env:USERDOMAIN\$env:USERNAME" --password-env LRDP_PW
 .\build\bin\Release\localrdp.exe stop
 ```
+
+`-H=windowsgui` 让 exe 成为图形子系统程序：双击不会有黑框控制台。从终端调用时程序自己
+`AttachConsole` 到父终端，`status` 的输出照常看得见；被重定向到管道或文件时用继承来的句柄，
+`| Out-File`、`$out = & localrdp.exe status` 也照常工作。
 
 `localrdp-ui.ps1` 在找不到 exe 时调用 `build.ps1` 编译（等价于上面的 `go build`）。
 

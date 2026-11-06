@@ -40,4 +40,4 @@ jobs:
         run: go test ./...
 
       - name: Build
-        run: go build -trimpath -ldflags '-s -w' -o build/bin/Release/localrdp.exe .
+        run: go build -trimpath -ldflags '-s -w -H=windowsgui' -o build/bin/Release/localrdp.exe .

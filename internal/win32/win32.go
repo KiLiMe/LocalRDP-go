@@ -38,6 +38,8 @@ var (
 	procSwitchToThisWindow       = user32.NewProc("SwitchToThisWindow")
 	kernel32                     = syscall.NewLazyDLL("kernel32.dll")
 	procFreeConsole              = kernel32.NewProc("FreeConsole")
+	procAttachConsole            = kernel32.NewProc("AttachConsole")
+	procSetStdHandle             = kernel32.NewProc("SetStdHandle")
 )
 
 // swRestore is ShowWindow's SW_RESTORE.
@@ -45,8 +47,52 @@ const swRestore = 9
 
 // FreeConsole drops the console this process was given, so a window that is
 // started by double clicking does not come with a black console behind it.
+// It only matters for a console subsystem build: the released exe is linked
+// with -H windowsgui and is never given a console in the first place.
 func FreeConsole() {
 	procFreeConsole.Call()
+}
+
+// attachParentProcess is AttachConsole's ATTACH_PARENT_PROCESS.
+const attachParentProcess = ^uint32(0)
+
+// AttachStdio connects the standard streams to the terminal that started this
+// program and reports whether it did. The released exe is a GUI subsystem
+// program (-H windowsgui), so Windows gives it no console at all and
+// `localrdp status` would print into nothing; a program that was double
+// clicked has no parent console and this does nothing. Streams that were
+// redirected to a pipe or a file are left alone: the handles are already the
+// ones the caller handed over.
+func AttachStdio() bool {
+	if h, err := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE); err == nil && h != 0 && h != syscall.InvalidHandle {
+		return false
+	}
+	if r, _, _ := procAttachConsole.Call(uintptr(attachParentProcess)); r == 0 {
+		return false
+	}
+	rebind(syscall.STD_OUTPUT_HANDLE, "CONOUT$", "stdout")
+	rebind(syscall.STD_ERROR_HANDLE, "CONOUT$", "stderr")
+	rebind(syscall.STD_INPUT_HANDLE, "CONIN$", "stdin")
+	return true
+}
+
+// rebind opens name and makes it the standard stream id, for this process and
+// for the children it starts.
+func rebind(id int, name, label string) {
+	fd, err := syscall.Open(name, syscall.O_RDWR, 0)
+	if err != nil {
+		return
+	}
+	file := os.NewFile(uintptr(fd), label)
+	procSetStdHandle.Call(uintptr(id), uintptr(fd))
+	switch id {
+	case syscall.STD_OUTPUT_HANDLE:
+		os.Stdout = file
+	case syscall.STD_ERROR_HANDLE:
+		os.Stderr = file
+	case syscall.STD_INPUT_HANDLE:
+		os.Stdin = file
+	}
 }
 
 // BringToFront shows and focuses the host window of a child process. The
