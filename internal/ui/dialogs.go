@@ -1,5 +1,5 @@
-// dialogs.go is the dialog the window opens over itself: the settings,
-// the sessions of the store, and the question before it quits.
+// dialogs.go is the dialog the window opens over itself: the settings, and
+// the question before it quits.
 package ui
 
 import (
@@ -29,31 +29,6 @@ func (st *State) settingsDialog(c *myui.Context) {
 					st.Act.Do(st.Act.SaveSettings)
 					st.SettingsOpen = false
 				})
-			})
-		})
-	})
-}
-
-// sessionsDialog is the sessions the store remembers.
-func (st *State) sessionsDialog(c *myui.Context) {
-	myui.Modal(c, &st.SessionsOpen, func() {
-		st.dialog(c, T("Sessions"), func() {
-			myui.Button(c, "+ "+T("New session")).OnClick(func() {
-				st.SessionsOpen = false
-				st.Active = -1
-			})
-			for i := range st.Sessions {
-				tab := &st.Sessions[i]
-				myui.Row(c).Gap(8).AlignItems(myui.Center).Children(func() {
-					myui.Text(c, tab.Label()).FontSize(12).Grow(1).SingleLine()
-					if myui.Button(c, T("Show session")).Clicked() {
-						st.SessionsOpen = false
-						st.Act.Do(func() { st.Act.ShowSession(tab.Session.ID()) })
-					}
-				})
-			}
-			myui.Row(c).Justify(myui.End).Children(func() {
-				myui.Button(c, T("Close")).OnClick(func() { st.SessionsOpen = false })
 			})
 		})
 	})

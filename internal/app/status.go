@@ -11,9 +11,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 
-	"localrdp/internal/store"
 	"localrdp/internal/win32"
 )
 
@@ -105,50 +103,6 @@ func runElevated(script string) int {
 	_ = syscall.GetExitCodeProcess(syscall.Handle(info.hProcess), &code)
 	_ = syscall.CloseHandle(syscall.Handle(info.hProcess))
 	return int(code)
-}
-
-// makeShortcut writes the shortcut on the desktop that opens this window.
-func makeShortcut() error {
-	desktop, err := desktopDir()
-	if err != nil {
-		return err
-	}
-	path := filepath.Join(desktop, "LocalRDP 控制台.lnk")
-	body := `Set s = CreateObject("WScript.Shell")` + "\r\n" +
-		`Set l = s.CreateShortcut("` + path + `")` + "\r\n" +
-		`l.TargetPath = "` + win32.ExePath() + `"` + "\r\n" +
-		`l.Arguments = "-gui"` + "\r\n" +
-		`l.WorkingDirectory = "` + win32.ExeDir() + `"` + "\r\n" +
-		`l.IconLocation = "` + win32.ExePath() + `,0"` + "\r\n" +
-		`l.Save` + "\r\n"
-	_ = os.MkdirAll(store.Dir(), 0o755)
-	tmp := filepath.Join(store.Dir(), "shortcut.vbs")
-	if err := os.WriteFile(tmp, []byte(body), 0o644); err != nil {
-		return err
-	}
-	cmd := exec.Command("wscript.exe", "//nologo", tmp)
-	win32.HideWindow(cmd)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s: %s", err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
-// desktopDir is the desktop of this account.
-func desktopDir() (string, error) {
-	key, err := registry.OpenKey(registry.CURRENT_USER,
-		`Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders`, registry.QUERY_VALUE)
-	if err == nil {
-		defer key.Close()
-		if value, _, err := key.GetStringValue("Desktop"); err == nil {
-			return os.ExpandEnv(value), nil
-		}
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, "Desktop"), nil
 }
 
 // copyText puts s on the clipboard.

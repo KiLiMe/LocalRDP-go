@@ -239,15 +239,6 @@ func (a *actions) ForgetPassword() {
 	})
 }
 
-// Shortcut puts one on the desktop that opens this window.
-func (a *actions) Shortcut() {
-	if err := makeShortcut(); err != nil {
-		a.Do(func() { a.St.FormErr, a.St.FormErrOn = err.Error(), "" })
-		return
-	}
-	a.Do(func() { a.St.Status = ui.T("Shortcut made") })
-}
-
 // OpenDataFolder shows the folder the program keeps its things in.
 func (a *actions) OpenDataFolder() {
 	_ = os.MkdirAll(store.Dir(), 0o755)
@@ -287,11 +278,6 @@ func (a *actions) CloseSession(id string) {
 	if a.St.Open {
 		a.Do(a.LogOff)
 	}
-}
-
-// FocusSession picks a tab.
-func (a *actions) FocusSession(index int) {
-	a.Do(func() { a.St.Active = index })
 }
 
 // ClearLog drops the log the window shows.

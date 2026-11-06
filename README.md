@@ -102,12 +102,15 @@ win32/  纯 Win32 小工具，无依赖
 rdp/    命令行与 RDP 宿主；只有 gui_shim.go 向上调 app 开窗口，其余不依赖 app/ui
 i18n/   英文文案 → 中文映射；缺条目回落英文，缺口可见
 store/  设置、记住的会话、DPAPI 加密密码（叶子包，不依赖其它内部包）
-ui/     窗口绘制：标题栏、控制台表单、会话栏、日志（只读 State）
+ui/     窗口绘制：标题栏、会话表单、会话页、环境/日志面板（只读 State）
 app/    窗口逻辑：动作、子进程管理、状态刷新、日志跟随
 mcp/    MCP 协议层（工具表由 internal/rdp/mcp.go 注册）
 ```
 
 脚本：`localrdp.cmd` / `localrdp-ui.ps1` / `install-privileges.ps1` / `build.ps1`
+
+资源：`rsrc_windows_amd64.syso`（exe 的图标与版本信息，`go build` 自动链入）；
+`winres/localrdp.ico` 由 `tools/genicon/main.go` 画出来（`go run tools/genicon/main.go`）。
 
 CI：`.github/workflows/ci.yml` 在 `windows-latest` 上跑 `go vet` / `gofmt -l` / `go test` / `go build`，
 push 与 PR 都触发。

@@ -40,6 +40,7 @@ var (
 	iconDesktopOn = paths("M3 5h18v11H3z", "M9 20h6", "M12 16v4",
 		"M20 3a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0", "M16.8 1.6v2.8M15.4 3h2.8")
 	iconTerminal = text("&gt;_")
+	iconPlus     = paths("M12 6v12", "M6 12h12")
 	iconClose    = paths("M6 6l12 12", "M18 6L6 18")
 	iconCopy     = paths("M9 9h10v10H9z", "M15 5H5v10")
 	iconBroom    = paths("M4 20l6-6", "M9 9l6 6", "M14 4l6 6", "M8 10l6 6-3 2-5-5z")

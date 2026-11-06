@@ -1,16 +1,6 @@
+// hooks.go is what the app installs into the window, so a view can ask the
+// things only the app knows, and small helpers of two views.
 package ui
-
-import "strings"
-
-func trimSpace(s string) string { return strings.TrimSpace(s) }
-
-// modeBadge is the badge a session's mode shows.
-func modeBadge(mode string) string {
-	if mode == "start" {
-		return "start"
-	}
-	return "desktop"
-}
 
 // storeHasSecret reports whether a password is cached; the form reads it
 // through the window, so a test can answer it without a file.

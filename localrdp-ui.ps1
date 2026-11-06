@@ -4,12 +4,12 @@
     .\localrdp.cmd                  -> 菜单
     pwsh .\localrdp-ui.ps1 desktop  -> 直接开子桌面
     pwsh .\localrdp-ui.ps1 start pwsh -> 在子会话里跑 pwsh
-    pwsh .\localrdp-ui.ps1 status|stop|setup|build|shortcut
+    pwsh .\localrdp-ui.ps1 status|stop|setup|build
   密码用 DPAPI(当前用户) 加密缓存到 %LOCALAPPDATA%\LocalRDP\cred.dat，可用 -Forget 清除。
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('menu', 'desktop', 'start', 'status', 'stop', 'setup', 'build', 'shortcut')]
+    [ValidateSet('menu', 'desktop', 'start', 'status', 'stop', 'setup', 'build')]
     [string]$Action = 'menu',
     [string]$Program = '',
     [switch]$Fullscreen,
@@ -156,18 +156,6 @@ function Stop-Session {
     $rc = Invoke-LocalRdp @('stop'); return $rc
 }
 
-function New-Shortcut {
-    $desktop = [Environment]::GetFolderPath('Desktop')
-    $lnk = Join-Path $desktop 'LocalRDP 子桌面.lnk'
-    $sh = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-    $sh.TargetPath       = (Join-Path $Root 'localrdp.cmd')
-    $sh.WorkingDirectory = $Root
-    $sh.IconLocation     = "$env:SystemRoot\System32\mstsc.exe,0"
-    $sh.Description      = 'LocalRDP：本机 loopback 子会话桌面'
-    $sh.Save()
-    Say "  已创建快捷方式：$lnk" 'Green'
-}
-
 function Show-Menu {
     while ($true) {
         Title "LocalRDP 一键启动器    ($User)"
@@ -183,8 +171,7 @@ function Show-Menu {
         Write-Host ('  4) 停止子会话' + $(if ($cid -ne '(none)') { "（注销会话 $cid）" } else { '（当前无）' }))
         Write-Host '  5) 清除缓存密码'
         Write-Host '  6) 授予特权 / 修复安装（管理员）'
-        Write-Host '  7) 创建桌面快捷方式'
-        Write-Host '  8) 查看日志'
+        Write-Host '  7) 查看日志'
         Write-Host '  0) 退出'
         $c = Read-Host '  选择'
         switch ($c) {
@@ -200,8 +187,7 @@ function Show-Menu {
                 $s = Join-Path $Root 'install-privileges.ps1'
                 Start-Process pwsh -Verb RunAs -ArgumentList @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$s`"") -Wait
             }
-            '7' { New-Shortcut }
-            '8' {
+            '7' {
                 if (Test-Path -LiteralPath $LogFile) { Get-Content -LiteralPath $LogFile -Tail 40 | Out-Host }
                 else { Say '  还没有日志。' 'Yellow' }
             }
@@ -228,7 +214,6 @@ switch ($Action) {
     'status'   { exit (Show-Status) }
     'stop'     { exit (Stop-Session) }
     'build'    { if (Ensure-Exe) { Say "  OK: $Exe" 'Green' } else { Say '  失败' 'Red' } }
-    'shortcut' { New-Shortcut }
     'setup'    {
         $s = Join-Path $Root 'install-privileges.ps1'
         Start-Process pwsh -Verb RunAs -ArgumentList @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$s`"") -Wait

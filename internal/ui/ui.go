@@ -1,5 +1,6 @@
 // Package ui draws the window: the band at the top, the console of the
-// session form, the panel of what is open, and the log.
+// session form, the tab of the session it opened, and the panel of what is
+// open and of the log.
 //
 // It draws a State and does nothing else: a click calls an Actions method,
 // which changes the state and asks for a frame. The state lives here, so
@@ -28,16 +29,12 @@ type Actions interface {
 	GrantPrivileges()
 	// ForgetPassword drops the cached password.
 	ForgetPassword()
-	// Shortcut puts one on the desktop that opens this window.
-	Shortcut()
 	// OpenDataFolder shows %LOCALAPPDATA%\LocalRDP.
 	OpenDataFolder()
 	// ShowSession brings a session's window up.
 	ShowSession(id string) bool
 	// CloseSession ends one and closes its tab.
 	CloseSession(id string)
-	// FocusSession picks a tab.
-	FocusSession(index int)
 	// ClearLog drops the log the window shows.
 	ClearLog()
 	// CopyLog puts the log on the clipboard.
@@ -76,7 +73,6 @@ type State struct {
 	Sessions []Tab
 	// Active is the tab in front, -1 for none: the console.
 	Active int
-
 	// Open is whether a child session runs, SessionID its id as status
 	// names it, empty when none does.
 	Open      bool
@@ -96,9 +92,8 @@ type State struct {
 	Settings     store.Settings
 	SettingsOpen bool
 
-	// SessionsOpen and CloseOpen show the lists of what is open.
-	SessionsOpen bool
-	CloseOpen    bool
+	// CloseOpen shows the question before the window closes a session.
+	CloseOpen bool
 
 	// Status is what the window says it is doing, in one line.
 	Status string
