@@ -1,4 +1,4 @@
-package main
+package rdp
 
 import (
 	"fmt"
@@ -60,20 +60,20 @@ func defaultOptions() StartOptions {
 
 // EnvReport mirrors EnvReport in src/common.hpp.
 type EnvReport struct {
-	EditionID           string
-	BuildNumber         string
-	HomeEdition         bool
-	ChildSessionsOn     bool
-	TermServiceRunning  bool
-	RdpListenerEnabled  bool
-	RdpControlOK        bool
-	InsideChildSession  bool
-	Elevated            bool
-	ChildSessionID      uint32
-	CurrentSessionID    uint32
-	TransportStatus     uint32
-	TransportPipe       string
-	NextAction          string
+	EditionID          string
+	BuildNumber        string
+	HomeEdition        bool
+	ChildSessionsOn    bool
+	TermServiceRunning bool
+	RdpListenerEnabled bool
+	RdpControlOK       bool
+	InsideChildSession bool
+	Elevated           bool
+	ChildSessionID     uint32
+	CurrentSessionID   uint32
+	TransportStatus    uint32
+	TransportPipe      string
+	NextAction         string
 }
 
 func (r EnvReport) blocked() bool {
@@ -98,15 +98,6 @@ var (
 	procGetModuleHandle = kernel32.NewProc("GetModuleFileNameW")
 )
 
-func utf16Ptr(s string) *uint16 {
-	p, err := syscall.UTF16PtrFromString(s)
-	if err != nil {
-		u := syscall.StringToUTF16(s)
-		return &u[0]
-	}
-	return p
-}
-
 func utf16Slice(s string) []uint16 { return syscall.StringToUTF16(s) }
 
 func u2s(p *uint16) string {
@@ -122,9 +113,6 @@ func u2s(p *uint16) string {
 	}
 	return syscall.UTF16ToString(unsafe.Slice(p, n))
 }
-
-//itoa is a small helper used all over the log strings.
-func itoa(v int) string { return fmt.Sprintf("%d", v) }
 
 func formatWin32(err uint32) string {
 	var buf unsafe.Pointer

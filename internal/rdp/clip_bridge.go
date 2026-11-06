@@ -1,4 +1,4 @@
-package main
+package rdp
 
 import (
 	"runtime"
@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/lxn/win"
+	"localrdp/internal/win32"
 )
 
 // dropFiles 是 DROPFILES：DWORD pFiles; POINT pt; BOOL fNC; BOOL fWide。
@@ -218,11 +219,11 @@ func clipBridgeMain(role int, parent uint32) {
 		CbSize:        uint32(unsafe.Sizeof(win.WNDCLASSEX{})),
 		LpfnWndProc:   clipWndProcCb,
 		HInstance:     inst,
-		LpszClassName: utf16Ptr("LocalRDP.ClipBridge"),
+		LpszClassName: win32.UTF16Ptr("LocalRDP.ClipBridge"),
 	}
 	win.RegisterClassEx(&wc)
 
-	hwnd := win.CreateWindowEx(0, utf16Ptr("LocalRDP.ClipBridge"), nil, 0, 0, 0, 0, 0,
+	hwnd := win.CreateWindowEx(0, win32.UTF16Ptr("LocalRDP.ClipBridge"), nil, 0, 0, 0, 0, 0,
 		win.HWND_MESSAGE, 0, inst, nil)
 	if hwnd == 0 {
 		logWarn("剪贴板桥创建消息窗失败")

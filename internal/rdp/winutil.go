@@ -1,6 +1,7 @@
-package main
+package rdp
 
 import (
+	"localrdp/internal/win32"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +17,6 @@ var (
 	procGetEnvironmentVarW   = kernel32.NewProc("GetEnvironmentVariableW")
 	procGetTempPathW         = kernel32.NewProc("GetTempPathW")
 	procCreateDirectoryW     = kernel32.NewProc("CreateDirectoryW")
-	procGetShortPathNameW    = kernel32.NewProc("GetShortPathNameW")
 	procOpenProcessToken     = advapi32.NewProc("OpenProcessToken")
 	procGetTokenInformation  = advapi32.NewProc("GetTokenInformation")
 	procLookupPrivilegeValue = advapi32.NewProc("LookupPrivilegeValueW")
@@ -51,44 +51,21 @@ type tokenPrivileges struct {
 }
 
 type shellExecuteInfo struct {
-	cbSize         uint32
-	fMask          uint32
-	hwnd           uintptr
-	lpVerb         *uint16
-	lpFile         *uint16
-	lpParameters   *uint16
-	lpDirectory    *uint16
-	nShow          int32
-	hInstApp       uintptr
-	lpIDList       uintptr
-	lpClass        *uint16
-	hkeyClass      uintptr
-	dwHotKey       uint32
-	hIcon          uintptr
-	hProcess       uintptr
-}
-
-func exePath() string {
-	buf := make([]uint16, syscall.MAX_PATH)
-	for {
-		n, _, _ := procGetModuleFileNameW.Call(0, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
-		if n == 0 {
-			return ""
-		}
-		if int(n) < len(buf)-1 {
-			return syscall.UTF16ToString(buf[:n])
-		}
-		buf = make([]uint16, len(buf)*2)
-	}
-}
-
-func exeDir() string {
-	p := exePath()
-	i := strings.LastIndexAny(p, "\\/")
-	if i < 0 {
-		return "."
-	}
-	return p[:i]
+	cbSize       uint32
+	fMask        uint32
+	hwnd         uintptr
+	lpVerb       *uint16
+	lpFile       *uint16
+	lpParameters *uint16
+	lpDirectory  *uint16
+	nShow        int32
+	hInstApp     uintptr
+	lpIDList     uintptr
+	lpClass      *uint16
+	hkeyClass    uintptr
+	dwHotKey     uint32
+	hIcon        uintptr
+	hProcess     uintptr
 }
 
 func currentProcessID() uint32 {
@@ -113,7 +90,7 @@ func processSessionID(pid uint32) (uint32, bool) {
 
 func isElevated() bool {
 	var tok syscall.Token
-	r, _, _ := procOpenProcessToken.Call(^uintptr(0) /*GetCurrentProcess*/, 0x0008 /*TOKEN_QUERY*/,
+	r, _, _ := procOpenProcessToken.Call(^uintptr(0) /*GetCurrentProcess*/, 0x0008, /*TOKEN_QUERY*/
 		uintptr(unsafe.Pointer(&tok)))
 	if r == 0 {
 		return false
@@ -121,7 +98,7 @@ func isElevated() bool {
 	defer syscall.CloseHandle(syscall.Handle(tok))
 	var elev tokenElevation
 	var n uint32
-	r, _, _ = procGetTokenInformation.Call(uintptr(tok), 20 /*TokenElevation*/,
+	r, _, _ = procGetTokenInformation.Call(uintptr(tok), 20, /*TokenElevation*/
 		uintptr(unsafe.Pointer(&elev)), unsafe.Sizeof(elev), uintptr(unsafe.Pointer(&n)))
 	return r != 0 && elev.TokenIsElevated != 0
 }
@@ -134,7 +111,7 @@ func enablePrivilege(name string) bool {
 	}
 	defer syscall.CloseHandle(tok)
 	var l luid
-	if r, _, _ := procLookupPrivilegeValue.Call(0, uintptr(unsafe.Pointer(utf16Ptr(name))),
+	if r, _, _ := procLookupPrivilegeValue.Call(0, uintptr(unsafe.Pointer(win32.UTF16Ptr(name))),
 		uintptr(unsafe.Pointer(&l))); r == 0 {
 		return false
 	}
@@ -155,7 +132,7 @@ func enablePrivilege(name string) bool {
 // commandLineTail returns the whole command line of this process (used to re-launch elevated).
 func commandLineTail() string {
 	p, _, _ := procGetCommandLine.Call()
-	full := u2s((*uint16)(unsafe.Pointer(p)))
+	full := u2s(ptrAt[uint16](p))
 	if full == "" {
 		return ""
 	}
@@ -176,9 +153,9 @@ func relaunchElevated(args string) int {
 	sei := shellExecuteInfo{}
 	sei.cbSize = uint32(unsafe.Sizeof(sei))
 	sei.fMask = 0x00000040 // SEE_MASK_NOCLOSEPROCESS
-	sei.lpVerb = utf16Ptr("runas")
-	sei.lpFile = utf16Ptr(exePath())
-	sei.lpParameters = utf16Ptr(args)
+	sei.lpVerb = win32.UTF16Ptr("runas")
+	sei.lpFile = win32.UTF16Ptr(win32.ExePath())
+	sei.lpParameters = win32.UTF16Ptr(args)
 	sei.nShow = 1
 	if r, _, err := procShellExecuteExW.Call(uintptr(unsafe.Pointer(&sei))); r == 0 {
 		errno := uint32(err.(syscall.Errno))
@@ -198,12 +175,12 @@ func relaunchElevated(args string) int {
 }
 
 func getEnvVar(name string) string {
-	n, _, _ := procGetEnvironmentVarW.Call(uintptr(unsafe.Pointer(utf16Ptr(name))), 0, 0)
+	n, _, _ := procGetEnvironmentVarW.Call(uintptr(unsafe.Pointer(win32.UTF16Ptr(name))), 0, 0)
 	if n == 0 {
 		return ""
 	}
 	buf := make([]uint16, n)
-	n, _, _ = procGetEnvironmentVarW.Call(uintptr(unsafe.Pointer(utf16Ptr(name))),
+	n, _, _ = procGetEnvironmentVarW.Call(uintptr(unsafe.Pointer(win32.UTF16Ptr(name))),
 		uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
 	if n == 0 {
 		return ""
@@ -239,7 +216,7 @@ func ensureDir(path string) bool {
 			return false
 		}
 	}
-	r, _, err := procCreateDirectoryW.Call(uintptr(unsafe.Pointer(utf16Ptr(path))), 0)
+	r, _, err := procCreateDirectoryW.Call(uintptr(unsafe.Pointer(win32.UTF16Ptr(path))), 0)
 	if r != 0 {
 		return true
 	}
@@ -307,20 +284,6 @@ func buildCommandLine(args []string) string {
 		parts[i] = quoteArg(a)
 	}
 	return strings.Join(parts, " ")
-}
-
-func getShortPath(path string) string {
-	n, _, _ := procGetShortPathNameW.Call(uintptr(unsafe.Pointer(utf16Ptr(path))), 0, 0)
-	if n == 0 {
-		return path
-	}
-	buf := make([]uint16, n+1)
-	n, _, _ = procGetShortPathNameW.Call(uintptr(unsafe.Pointer(utf16Ptr(path))),
-		uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
-	if n == 0 {
-		return path
-	}
-	return syscall.UTF16ToString(buf[:n])
 }
 
 type rect struct{ Left, Top, Right, Bottom int32 }

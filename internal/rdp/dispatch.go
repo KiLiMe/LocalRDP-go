@@ -1,4 +1,4 @@
-package main
+package rdp
 
 import (
 	"syscall"
@@ -18,8 +18,8 @@ const (
 	dispatchPropGet    = 2
 	dispatchPropPut    = 4
 	dispatchPropPutRef = 8
-	dispidPropertyPut = -3
-	localeUserDefault = 0x0400
+	dispidPropertyPut  = -3
+	localeUserDefault  = 0x0400
 
 	hrOK          = uintptr(0)
 	hrNotImpl     = uintptr(0x80004001)
@@ -116,9 +116,11 @@ func (d disp) get(name string) (variant, uintptr) {
 	return out, hr
 }
 
-func p2u(p unsafe.Pointer) uint64 { return uint64(uintptr(p)) }
-
-func u2p(u uint64) unsafe.Pointer { return unsafe.Pointer(uintptr(u)) }
+func u2p(u uint64) unsafe.Pointer {
+	var p unsafe.Pointer
+	*(*uint64)(unsafe.Pointer(&p)) = u
+	return p
+}
 
 func (d disp) getDispatch(name string) (unsafe.Pointer, uintptr) {
 	v, hr := d.get(name)

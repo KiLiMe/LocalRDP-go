@@ -1,4 +1,4 @@
-package main
+package rdp
 
 import (
 	"runtime"
@@ -6,6 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/lxn/win"
+	"localrdp/internal/win32"
 )
 
 // processAlive 判断进程是否仍在运行。
@@ -33,14 +34,14 @@ func runSessionEntryProcess(job *StartOptions) int32 {
 	}
 	var si startupInfo
 	si.Cb = uint32(unsafe.Sizeof(si))
-	si.Desktop = utf16Ptr("winsta0\\default")
+	si.Desktop = win32.UTF16Ptr("winsta0\\default")
 	var pi processInformation
 	var workDir *uint16
 	if job.WorkDir != "" {
-		workDir = utf16Ptr(job.WorkDir)
+		workDir = win32.UTF16Ptr(job.WorkDir)
 	}
 	r, _, err := procCreateProcessW.Call(0,
-		uintptr(unsafe.Pointer(utf16Ptr(cmdLine))), 0, 0, 0,
+		uintptr(unsafe.Pointer(win32.UTF16Ptr(cmdLine))), 0, 0, 0,
 		uintptr(createNewConsole|createUnicodeEnvironment),
 		0, uintptr(unsafe.Pointer(workDir)), uintptr(unsafe.Pointer(&si)), uintptr(unsafe.Pointer(&pi)))
 	if r == 0 {

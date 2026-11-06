@@ -1,8 +1,6 @@
-package main
+package rdp
 
 import (
-	"strings"
-
 	"github.com/lxn/win"
 )
 
@@ -68,5 +66,3 @@ func splitCommand(rest []string) string {
 	}
 	return buildCommandLine(rest)
 }
-
-func hasPrefixFold(s, prefix string) bool { return strings.HasPrefix(strings.ToLower(s), strings.ToLower(prefix)) }

@@ -1,10 +1,12 @@
-package main
+package rdp
 
 import (
 	"syscall"
 	"unsafe"
 
 	"github.com/lxn/win"
+
+	"localrdp/internal/win32"
 )
 
 var (
@@ -23,20 +25,20 @@ var (
 // IMsRdpClientNonScriptable3 的 vtable 下标（IUnknown 3 + IMsTscNonScriptable 10 +
 // IMsRdpClientNonScriptable 2 + ...2 2 = 17 起）。
 const (
-	nsPutShowRedirectionWarningDialog = 17
-	nsPutPromptForCredentials         = 19
-	nsPutRedirectDynamicDrives        = 25
-	nsGetDriveCollection              = 30
-	nsPutWarnAboutSendingCredentials  = 31
+	nsPutShowRedirectionWarningDialog  = 17
+	nsPutPromptForCredentials          = 19
+	nsPutRedirectDynamicDrives         = 25
+	nsGetDriveCollection               = 30
+	nsPutWarnAboutSendingCredentials   = 31
 	nsPutWarnAboutClipboardRedirection = 33
-	nsPutConnectionBarText            = 35
+	nsPutConnectionBarText             = 35
 )
 
 // IMsRdpClientNonScriptable4 从 37 起。
 const (
-	ns4PutWarnAboutPrinterRedirection   = 43
+	ns4PutWarnAboutPrinterRedirection     = 43
 	ns4PutLaunchedViaClientShellInterface = 49
-	ns4PutTrustedZoneSite               = 51
+	ns4PutTrustedZoneSite                 = 51
 )
 
 // IMsRdpDriveCollection：RescanDrives=3, get_DriveByIndex=4, get_DriveCount=5
@@ -148,7 +150,7 @@ func (h *axHost) enableRedirectedDrives() {
 		for i := uint32(0); i < n; i++ {
 			var d unsafe.Pointer
 			if hr := vtCall(col, dcDriveByIndex, uintptr(i), uintptr(unsafe.Pointer(&d))); hrFailed(hr) || d == nil {
-				logWarn("DriveByIndex " + itoa(int(i)) + " 失败 " + formatHr(uint32(hr)))
+				logWarn("DriveByIndex " + win32.Itoa(int(i)) + " 失败 " + formatHr(uint32(hr)))
 				continue
 			}
 			var nm uint16Ptr
@@ -158,8 +160,8 @@ func (h *axHost) enableRedirectedDrives() {
 			vtCall(d, driveGetRedirect, uintptr(unsafe.Pointer(&st)))
 			name := "?"
 			if nm != 0 {
-				name = u2s((*uint16)(unsafe.Pointer(nm)))
-				win.SysFreeString((*uint16)(unsafe.Pointer(nm)))
+				name = u2s(ptrAt[uint16](nm))
+				win.SysFreeString(ptrAt[uint16](nm))
 			}
 			state := "NOT redirected"
 			if st != 0 {
@@ -452,7 +454,7 @@ var eventNames = map[int32]string{
 func describeEvent(id int32, args []variant) string {
 	name := eventNames[id]
 	if name == "" {
-		name = "dispid" + itoa(int(id))
+		name = "dispid" + win32.Itoa(int(id))
 	}
 	s := name
 	for i := range args {

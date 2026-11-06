@@ -12,6 +12,7 @@ import (
 	"localrdp/internal/i18n"
 	"localrdp/internal/store"
 	"localrdp/internal/ui"
+	"localrdp/internal/win32"
 
 	"github.com/egoist/mygo"
 )
@@ -35,9 +36,9 @@ func newApp(session store.Session, opts Options) *App {
 	st.Form = session
 	st.Password = ""
 	st.SavePassword = st.Settings.SavePasswords
-	st.TimeoutText = itoa(session.Timeout)
-	st.WidthText = itoa(session.Width)
-	st.HeightText = itoa(session.Height)
+	st.TimeoutText = win32.Itoa(session.Timeout)
+	st.WidthText = win32.Itoa(session.Width)
+	st.HeightText = win32.Itoa(session.Height)
 	st.SetMode(session.Mode)
 	st.Sessions = opts.Sessions
 	st.Active = opts.Active

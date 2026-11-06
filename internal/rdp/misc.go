@@ -1,4 +1,4 @@
-package main
+package rdp
 
 import (
 	"fmt"
@@ -8,17 +8,15 @@ import (
 )
 
 var (
-	procEnumWindows              = user32.NewProc("EnumWindows")
-	procGetWindowTextW           = user32.NewProc("GetWindowTextW")
-	procGetWindowTextLengthW     = user32.NewProc("GetWindowTextLengthW")
-	procAdjustWindowRectEx       = user32.NewProc("AdjustWindowRectEx")
-	procMonitorFromPoint         = user32.NewProc("MonitorFromPoint")
-	procRemoveClipboardListener  = user32.NewProc("RemoveClipboardFormatListener")
-	procIsWindow                 = user32.NewProc("IsWindow")
-	procEqualSid                 = advapi32.NewProc("EqualSid")
-	procCreateProcessAsUserW     = advapi32.NewProc("CreateProcessAsUserW")
-	userenv                      = syscall.NewLazyDLL("userenv.dll")
-	dwmapi                       = syscall.NewLazyDLL("dwmapi.dll")
+	procEnumWindows             = user32.NewProc("EnumWindows")
+	procGetWindowTextW          = user32.NewProc("GetWindowTextW")
+	procGetWindowTextLengthW    = user32.NewProc("GetWindowTextLengthW")
+	procAdjustWindowRectEx      = user32.NewProc("AdjustWindowRectEx")
+	procMonitorFromPoint        = user32.NewProc("MonitorFromPoint")
+	procRemoveClipboardListener = user32.NewProc("RemoveClipboardFormatListener")
+	procCreateProcessAsUserW    = advapi32.NewProc("CreateProcessAsUserW")
+	userenv                     = syscall.NewLazyDLL("userenv.dll")
+	dwmapi                      = syscall.NewLazyDLL("dwmapi.dll")
 )
 
 func sprintf(format string, a ...any) string { return fmt.Sprintf(format, a...) }
@@ -50,22 +48,14 @@ func currentUserSID() []byte {
 		return nil
 	}
 	// Copy enough bytes for any SID (max 68 bytes).
-	return (*[68]byte)(unsafe.Pointer(sid))[:subAuthorityEnd(sid):subAuthorityEnd(sid)]
+	return ptrAt[[68]byte](sid)[:subAuthorityEnd(sid):subAuthorityEnd(sid)]
 }
 
 // subAuthorityEnd computes the actual length of a SID in bytes.
 func subAuthorityEnd(sid uintptr) int {
-	b := (*[68]byte)(unsafe.Pointer(sid))
+	b := ptrAt[[68]byte](sid)
 	n := int(b[1])
 	return 8 + n*4
-}
-
-func equalSID(a []byte, b uintptr) bool {
-	if len(a) == 0 || b == 0 {
-		return false
-	}
-	r, _, _ := procEqualSid.Call(uintptr(unsafe.Pointer(&a[0])), b)
-	return r != 0
 }
 
 func adjustWindowRectEx(r *win_Rect, style uint32, menu bool, ex uint32) bool {
@@ -76,11 +66,6 @@ func adjustWindowRectEx(r *win_Rect, style uint32, menu bool, ex uint32) bool {
 	ok, _, _ := procAdjustWindowRectEx.Call(uintptr(unsafe.Pointer(r)), uintptr(style),
 		uintptr(m), uintptr(ex))
 	return ok != 0
-}
-
-func isWindow(h uintptr) bool {
-	r, _, _ := procIsWindow.Call(h)
-	return r != 0
 }
 
 func removeClipboardFormatListener(hwnd uintptr) {

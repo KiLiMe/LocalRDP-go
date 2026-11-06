@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 
 	"localrdp/internal/store"
+	"localrdp/internal/win32"
 )
 
 // parseSessionID reads the child session of a status report.
@@ -39,10 +40,10 @@ func parseSessionID(out string) string {
 // needed to launch a process in the child session, enabled or not.
 func hasPrivileges() bool {
 	var assign, tcb windows.LUID
-	if windows.LookupPrivilegeValue(nil, utf16Ptr("SeAssignPrimaryTokenPrivilege"), &assign) != nil {
+	if windows.LookupPrivilegeValue(nil, win32.UTF16Ptr("SeAssignPrimaryTokenPrivilege"), &assign) != nil {
 		return false
 	}
-	if windows.LookupPrivilegeValue(nil, utf16Ptr("SeTcbPrivilege"), &tcb) != nil {
+	if windows.LookupPrivilegeValue(nil, win32.UTF16Ptr("SeTcbPrivilege"), &tcb) != nil {
 		return false
 	}
 	token := windows.GetCurrentProcessToken()
@@ -72,7 +73,7 @@ func privNote(granted bool) string {
 
 // privScript is the script that grants them, beside the program.
 func privScript() string {
-	path := filepath.Join(exeDir(), "install-privileges.ps1")
+	path := filepath.Join(win32.ExeDir(), "install-privileges.ps1")
 	if _, err := os.Stat(path); err != nil {
 		return ""
 	}
@@ -85,9 +86,9 @@ func runElevated(script string) int {
 	info := shellExecuteInfo{}
 	info.cbSize = uint32(unsafe.Sizeof(info))
 	info.fMask = 0x00000040 // SEE_MASK_NOCLOSEPROCESS
-	info.lpVerb = utf16Ptr("runas")
-	info.lpFile = utf16Ptr("pwsh.exe")
-	info.lpParameters = utf16Ptr(`-NoLogo -NoProfile -ExecutionPolicy Bypass -File "` + script + `"`)
+	info.lpVerb = win32.UTF16Ptr("runas")
+	info.lpFile = win32.UTF16Ptr("pwsh.exe")
+	info.lpParameters = win32.UTF16Ptr(`-NoLogo -NoProfile -ExecutionPolicy Bypass -File "` + script + `"`)
 	info.nShow = 1
 	r, _, err := shell32.NewProc("ShellExecuteExW").Call(uintptr(unsafe.Pointer(&info)))
 	if r == 0 {
@@ -115,10 +116,10 @@ func makeShortcut() error {
 	path := filepath.Join(desktop, "LocalRDP 控制台.lnk")
 	body := `Set s = CreateObject("WScript.Shell")` + "\r\n" +
 		`Set l = s.CreateShortcut("` + path + `")` + "\r\n" +
-		`l.TargetPath = "` + exePath() + `"` + "\r\n" +
+		`l.TargetPath = "` + win32.ExePath() + `"` + "\r\n" +
 		`l.Arguments = "-gui"` + "\r\n" +
-		`l.WorkingDirectory = "` + exeDir() + `"` + "\r\n" +
-		`l.IconLocation = "` + exePath() + `,0"` + "\r\n" +
+		`l.WorkingDirectory = "` + win32.ExeDir() + `"` + "\r\n" +
+		`l.IconLocation = "` + win32.ExePath() + `,0"` + "\r\n" +
 		`l.Save` + "\r\n"
 	_ = os.MkdirAll(store.Dir(), 0o755)
 	tmp := filepath.Join(store.Dir(), "shortcut.vbs")
@@ -126,7 +127,7 @@ func makeShortcut() error {
 		return err
 	}
 	cmd := exec.Command("wscript.exe", "//nologo", tmp)
-	hideWindow(cmd)
+	win32.HideWindow(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%s: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -153,7 +154,7 @@ func desktopDir() (string, error) {
 // copyText puts s on the clipboard.
 func copyText(s string) error {
 	cmd := exec.Command("clip.exe")
-	hideWindow(cmd)
+	win32.HideWindow(cmd)
 	cmd.Stdin = strings.NewReader(s)
 	return cmd.Run()
 }
@@ -161,15 +162,6 @@ func copyText(s string) error {
 // stderrf writes a line to the standard error.
 func stderrf(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stderr, format, args...)
-}
-
-// itoa is a number as text, or nothing for zero, so the field starts
-// empty and the session's own default shows.
-func itoa(n int) string {
-	if n <= 0 {
-		return ""
-	}
-	return strconv.Itoa(n)
 }
 
 var _ = syscall.SysProcAttr{}

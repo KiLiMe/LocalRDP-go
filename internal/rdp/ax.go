@@ -1,4 +1,4 @@
-package main
+package rdp
 
 import (
 	"fmt"
@@ -74,42 +74,42 @@ type controlSite struct {
 
 // IOleInPlaceSiteEx = IOleInPlaceSite(15) + 3
 type inPlaceSiteExVtbl struct {
-	QueryInterface, AddRef, Release       uintptr
-	GetWindow, ContextSensitiveHelp       uintptr
-	CanInPlaceActivate, OnInPlaceActivate uintptr
-	OnUIActivate, GetWindowContext        uintptr
-	Scroll, OnUIDeactivate                uintptr
-	OnInPlaceDeactivate, DiscardUndoState uintptr
-	DeactivateAndUndo, OnPosRectChange    uintptr
+	QueryInterface, AddRef, Release                               uintptr
+	GetWindow, ContextSensitiveHelp                               uintptr
+	CanInPlaceActivate, OnInPlaceActivate                         uintptr
+	OnUIActivate, GetWindowContext                                uintptr
+	Scroll, OnUIDeactivate                                        uintptr
+	OnInPlaceDeactivate, DiscardUndoState                         uintptr
+	DeactivateAndUndo, OnPosRectChange                            uintptr
 	OnInPlaceActivateEx, OnInPlaceDeactivateEx, RequestUIActivate uintptr
 }
 
 // IOleControlSite
- type controlSiteVtbl struct {
-	QueryInterface, AddRef, Release             uintptr
-	OnControlInfoChanged, LockInPlaceActive     uintptr
-	GetExtendedControl                          uintptr
-	TransformCoords, TranslateAccelerator       uintptr
-	OnFocus, ShowPropertyFrame                  uintptr
+type controlSiteVtbl struct {
+	QueryInterface, AddRef, Release         uintptr
+	OnControlInfoChanged, LockInPlaceActive uintptr
+	GetExtendedControl                      uintptr
+	TransformCoords, TranslateAccelerator   uintptr
+	OnFocus, ShowPropertyFrame              uintptr
 }
 
 // InitNew 在 SetClientSite 之前调用会让 mstscax 崩溃（0xc0000005@0x8），默认跳过。
 var noInitNew = true
 
 type axHost struct {
-	cs     clientSite
-	ips    inPlaceSite
-	ipf    inPlaceFrame
-	ev     evSink
-	ipsEx  inPlaceSiteEx
-	ctl    controlSite
-	hwnd   win.HWND
-	ctrl   unsafe.Pointer // 控件自身 IUnknown，对应 C++ 的 st->control
-	ole    *win.IOleObject
-	ipo    *win.IOleInPlaceObject
-	cp     *win.IConnectionPoint
-	cookie uint32
-	disp   unsafe.Pointer
+	cs      clientSite
+	ips     inPlaceSite
+	ipf     inPlaceFrame
+	ev      evSink
+	ipsEx   inPlaceSiteEx
+	ctl     controlSite
+	hwnd    win.HWND
+	ctrl    unsafe.Pointer // 控件自身 IUnknown，对应 C++ 的 st->control
+	ole     *win.IOleObject
+	ipo     *win.IOleInPlaceObject
+	cp      *win.IConnectionPoint
+	cookie  uint32
+	disp    unsafe.Pointer
 	onEvent func(id int32, args []variant)
 
 	appliedW, appliedH, appliedScale int
@@ -119,58 +119,58 @@ type axHost struct {
 
 var (
 	clientSiteVtbl = &win.IOleClientSiteVtbl{
-		syscall.NewCallback(csQueryInterface),
-		syscall.NewCallback(csAddRef),
-		syscall.NewCallback(csRelease),
-		syscall.NewCallback(csSaveObject),
-		syscall.NewCallback(csGetMoniker),
-		syscall.NewCallback(csGetContainer),
-		syscall.NewCallback(csShowObject),
-		syscall.NewCallback(csOnShowWindow),
-		syscall.NewCallback(csRequestNewObjectLayout),
+		QueryInterface:         syscall.NewCallback(csQueryInterface),
+		AddRef:                 syscall.NewCallback(csAddRef),
+		Release:                syscall.NewCallback(csRelease),
+		SaveObject:             syscall.NewCallback(csSaveObject),
+		GetMoniker:             syscall.NewCallback(csGetMoniker),
+		GetContainer:           syscall.NewCallback(csGetContainer),
+		ShowObject:             syscall.NewCallback(csShowObject),
+		OnShowWindow:           syscall.NewCallback(csOnShowWindow),
+		RequestNewObjectLayout: syscall.NewCallback(csRequestNewObjectLayout),
 	}
 	inPlaceSiteVtbl = &win.IOleInPlaceSiteVtbl{
-		syscall.NewCallback(ipsQueryInterface),
-		syscall.NewCallback(ipsAddRef),
-		syscall.NewCallback(ipsRelease),
-		syscall.NewCallback(ipsGetWindow),
-		syscall.NewCallback(ipsContextSensitiveHelp),
-		syscall.NewCallback(ipsCanInPlaceActivate),
-		syscall.NewCallback(ipsOnInPlaceActivate),
-		syscall.NewCallback(ipsOnUIActivate),
-		syscall.NewCallback(ipsGetWindowContext),
-		syscall.NewCallback(ipsScroll),
-		syscall.NewCallback(ipsOnUIDeactivate),
-		syscall.NewCallback(ipsOnInPlaceDeactivate),
-		syscall.NewCallback(ipsDiscardUndoState),
-		syscall.NewCallback(ipsDeactivateAndUndo),
-		syscall.NewCallback(ipsOnPosRectChange),
+		QueryInterface:       syscall.NewCallback(ipsQueryInterface),
+		AddRef:               syscall.NewCallback(ipsAddRef),
+		Release:              syscall.NewCallback(ipsRelease),
+		GetWindow:            syscall.NewCallback(ipsGetWindow),
+		ContextSensitiveHelp: syscall.NewCallback(ipsContextSensitiveHelp),
+		CanInPlaceActivate:   syscall.NewCallback(ipsCanInPlaceActivate),
+		OnInPlaceActivate:    syscall.NewCallback(ipsOnInPlaceActivate),
+		OnUIActivate:         syscall.NewCallback(ipsOnUIActivate),
+		GetWindowContext:     syscall.NewCallback(ipsGetWindowContext),
+		Scroll:               syscall.NewCallback(ipsScroll),
+		OnUIDeactivate:       syscall.NewCallback(ipsOnUIDeactivate),
+		OnInPlaceDeactivate:  syscall.NewCallback(ipsOnInPlaceDeactivate),
+		DiscardUndoState:     syscall.NewCallback(ipsDiscardUndoState),
+		DeactivateAndUndo:    syscall.NewCallback(ipsDeactivateAndUndo),
+		OnPosRectChange:      syscall.NewCallback(ipsOnPosRectChange),
 	}
 	inPlaceFrameVtbl = &win.IOleInPlaceFrameVtbl{
-		syscall.NewCallback(ipfQueryInterface),
-		syscall.NewCallback(ipfAddRef),
-		syscall.NewCallback(ipfRelease),
-		syscall.NewCallback(ipfGetWindow),
-		syscall.NewCallback(ipfContextSensitiveHelp),
-		syscall.NewCallback(ipfGetBorder),
-		syscall.NewCallback(ipfRequestBorderSpace),
-		syscall.NewCallback(ipfSetBorderSpace),
-		syscall.NewCallback(ipfSetActiveObject),
-		syscall.NewCallback(ipfInsertMenus),
-		syscall.NewCallback(ipfSetMenu),
-		syscall.NewCallback(ipfRemoveMenus),
-		syscall.NewCallback(ipfSetStatusText),
-		syscall.NewCallback(ipfEnableModeless),
-		syscall.NewCallback(ipfTranslateAccelerator),
+		QueryInterface:       syscall.NewCallback(ipfQueryInterface),
+		AddRef:               syscall.NewCallback(ipfAddRef),
+		Release:              syscall.NewCallback(ipfRelease),
+		GetWindow:            syscall.NewCallback(ipfGetWindow),
+		ContextSensitiveHelp: syscall.NewCallback(ipfContextSensitiveHelp),
+		GetBorder:            syscall.NewCallback(ipfGetBorder),
+		RequestBorderSpace:   syscall.NewCallback(ipfRequestBorderSpace),
+		SetBorderSpace:       syscall.NewCallback(ipfSetBorderSpace),
+		SetActiveObject:      syscall.NewCallback(ipfSetActiveObject),
+		InsertMenus:          syscall.NewCallback(ipfInsertMenus),
+		SetMenu:              syscall.NewCallback(ipfSetMenu),
+		RemoveMenus:          syscall.NewCallback(ipfRemoveMenus),
+		SetStatusText:        syscall.NewCallback(ipfSetStatusText),
+		EnableModeless:       syscall.NewCallback(ipfEnableModeless),
+		TranslateAccelerator: syscall.NewCallback(ipfTranslateAccelerator),
 	}
 	evSinkVtbl = &win.IDispatchVtbl{
-		syscall.NewCallback(evQueryInterface),
-		syscall.NewCallback(evAddRef),
-		syscall.NewCallback(evRelease),
-		syscall.NewCallback(evGetTypeInfoCount),
-		syscall.NewCallback(evGetTypeInfo),
-		syscall.NewCallback(evGetIDsOfNames),
-		syscall.NewCallback(evInvoke),
+		QueryInterface:   syscall.NewCallback(evQueryInterface),
+		AddRef:           syscall.NewCallback(evAddRef),
+		Release:          syscall.NewCallback(evRelease),
+		GetTypeInfoCount: syscall.NewCallback(evGetTypeInfoCount),
+		GetTypeInfo:      syscall.NewCallback(evGetTypeInfo),
+		GetIDsOfNames:    syscall.NewCallback(evGetIDsOfNames),
+		Invoke:           syscall.NewCallback(evInvoke),
 	}
 	inPlaceSiteExVtblVar = &inPlaceSiteExVtbl{
 		syscall.NewCallback(ipsExQueryInterface),
@@ -231,8 +231,8 @@ func csQueryInterface(self *clientSite, riid win.REFIID, ppv *unsafe.Pointer) ui
 	return hrOK
 }
 
-func csAddRef(self *clientSite) uintptr   { return 1 }
-func csRelease(self *clientSite) uintptr  { return 1 }
+func csAddRef(self *clientSite) uintptr     { return 1 }
+func csRelease(self *clientSite) uintptr    { return 1 }
 func csSaveObject(self *clientSite) uintptr { return hrNotImpl }
 
 func csGetMoniker(self *clientSite, assign, which uint32, ppmk *unsafe.Pointer) uintptr {
@@ -283,7 +283,7 @@ func ipsGetWindowContext(self *inPlaceSite, frame **inPlaceFrame, doc *unsafe.Po
 	return hrOK
 }
 
-func ipsScroll(self *inPlaceSite, dx, dy int32) uintptr { return hrNotImpl }
+func ipsScroll(self *inPlaceSite, dx, dy int32) uintptr              { return hrNotImpl }
 func ipsOnUIDeactivate(self *inPlaceSite, undoable win.BOOL) uintptr { return hrOK }
 func ipsOnInPlaceDeactivate(self *inPlaceSite) uintptr               { return hrOK }
 func ipsDiscardUndoState(self *inPlaceSite) uintptr                  { return hrNotImpl }
@@ -311,8 +311,8 @@ func ipfGetWindow(self *inPlaceFrame, lphwnd *win.HWND) uintptr {
 	return hrOK
 }
 
-func ipfContextSensitiveHelp(self *inPlaceFrame, enter win.BOOL) uintptr { return hrNotImpl }
-func ipfGetBorder(self *inPlaceFrame, rc *win.RECT) uintptr              { return hrNotImpl }
+func ipfContextSensitiveHelp(self *inPlaceFrame, enter win.BOOL) uintptr  { return hrNotImpl }
+func ipfGetBorder(self *inPlaceFrame, rc *win.RECT) uintptr               { return hrNotImpl }
 func ipfRequestBorderSpace(self *inPlaceFrame, bs unsafe.Pointer) uintptr { return hrNotImpl }
 func ipfSetBorderSpace(self *inPlaceFrame, bs unsafe.Pointer) uintptr     { return hrNotImpl }
 
@@ -451,7 +451,7 @@ func (h *axHost) create(clsid *win.CLSID, hwnd win.HWND) error {
 	var psiPtr unsafe.Pointer
 	if hr := h.ole.QueryInterface(&iidIPersistStreamInit, &psiPtr); hr >= 0 && psiPtr != nil {
 		psi := (*persistStreamInit)(psiPtr)
-		logf("步骤: QI IPersistStreamInit ok obj=%p vtbl=%p InitNew=%p", psiPtr, psi.lp, unsafe.Pointer(psi.lp.InitNew))
+		logf("步骤: QI IPersistStreamInit ok obj=%p vtbl=%p InitNew=%#x", psiPtr, psi.lp, psi.lp.InitNew)
 		if !noInitNew {
 			r, _, _ := syscall.SyscallN(psi.lp.InitNew, uintptr(psiPtr))
 			logf("步骤: InitNew ok hr=0x%08X", uint32(r))
@@ -580,7 +580,6 @@ func (h *axHost) disconnect() {
 	h.cp = nil
 }
 
-
 // ---------------------------------------------------------------- IOleInPlaceSiteEx / IOleControlSite
 
 func ipsExQueryInterface(self unsafe.Pointer, riid win.REFIID, ppv *unsafe.Pointer) uintptr {
@@ -605,11 +604,11 @@ func ipsGetWindowContext2(self unsafe.Pointer, frame **inPlaceFrame, doc *unsafe
 	return ipsGetWindowContext((*inPlaceSite)(self), frame, doc, pos, clip, info)
 }
 
-func ipsScroll2(self unsafe.Pointer, dx, dy int32) uintptr             { return hrNotImpl }
+func ipsScroll2(self unsafe.Pointer, dx, dy int32) uintptr              { return hrNotImpl }
 func ipsOnUIDeactivate2(self unsafe.Pointer, undoable win.BOOL) uintptr { return hrOK }
-func ipsOnInPlaceDeactivate2(self unsafe.Pointer) uintptr              { return hrOK }
-func ipsDiscardUndoState2(self unsafe.Pointer) uintptr                 { return hrNotImpl }
-func ipsDeactivateAndUndo2(self unsafe.Pointer) uintptr                { return hrNotImpl }
+func ipsOnInPlaceDeactivate2(self unsafe.Pointer) uintptr               { return hrOK }
+func ipsDiscardUndoState2(self unsafe.Pointer) uintptr                  { return hrNotImpl }
+func ipsDeactivateAndUndo2(self unsafe.Pointer) uintptr                 { return hrNotImpl }
 
 func ipsOnPosRectChange2(self unsafe.Pointer, rc *win.RECT) uintptr {
 	return ipsOnPosRectChange((*inPlaceSite)(self), rc)
@@ -634,12 +633,12 @@ func ctlQueryInterface(self unsafe.Pointer, riid win.REFIID, ppv *unsafe.Pointer
 	return csQueryInterface(&s.h.cs, riid, ppv)
 }
 
-func ctlOnControlInfoChanged(self unsafe.Pointer) uintptr                { return hrOK }
-func ctlLockInPlaceActive(self unsafe.Pointer, lock win.BOOL) uintptr    { return hrOK }
-func ctlTransformCoords(self unsafe.Pointer, a, b unsafe.Pointer, f uint32) uintptr { return hrNotImpl }
+func ctlOnControlInfoChanged(self unsafe.Pointer) uintptr                                 { return hrOK }
+func ctlLockInPlaceActive(self unsafe.Pointer, lock win.BOOL) uintptr                     { return hrOK }
+func ctlTransformCoords(self unsafe.Pointer, a, b unsafe.Pointer, f uint32) uintptr       { return hrNotImpl }
 func ctlTranslateAccelerator(self unsafe.Pointer, msg unsafe.Pointer, grf uint32) uintptr { return 1 }
-func ctlOnFocus(self unsafe.Pointer, gotFocus win.BOOL) uintptr         { return hrOK }
-func ctlShowPropertyFrame(self unsafe.Pointer) uintptr                  { return hrNotImpl }
+func ctlOnFocus(self unsafe.Pointer, gotFocus win.BOOL) uintptr                           { return hrOK }
+func ctlShowPropertyFrame(self unsafe.Pointer) uintptr                                    { return hrNotImpl }
 
 func ctlGetExtendedControl(self unsafe.Pointer, ppDisp *unsafe.Pointer) uintptr {
 	s := (*controlSite)(self)

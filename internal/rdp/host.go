@@ -1,4 +1,4 @@
-package main
+package rdp
 
 import (
 	"os"
@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	"github.com/lxn/win"
+	"localrdp/internal/win32"
 )
 
 const (
@@ -94,7 +95,7 @@ func applyDisplay(s *hostState) bool {
 		}
 		variantClear(&ret)
 		if hrFailed(hr) || status != 0 {
-			logWarn("Reconnect 尺寸回退失败 hr=" + formatHr(uint32(hr)) + " status=" + itoa(int(status)))
+			logWarn("Reconnect 尺寸回退失败 hr=" + formatHr(uint32(hr)) + " status=" + win32.Itoa(int(status)))
 			return false
 		}
 		logf("Display updated via Reconnect %dx%d", w, h)
@@ -219,8 +220,8 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		s.leaveFullscreen()
 	case 10: // OnFatalError
 		code := arg(0)
-		logError("RDP fatal error " + itoa(int(code)))
-		printErr("RDP fatal error " + itoa(int(code)))
+		logError("RDP fatal error " + win32.Itoa(int(code)))
+		printErr("RDP fatal error " + win32.Itoa(int(code)))
 		s.failed = true
 	case 14: // OnRequestContainerMinimize
 		if s.hwnd != 0 {
@@ -234,8 +235,8 @@ func (s *hostState) startClipBridge() {
 	if sid == kNoSession {
 		return
 	}
-	cmd := buildCommandLine([]string{exePath(), "--clip-bridge",
-		"--expect-session", itoa(int(sid)), "--parent-pid", itoa(int(currentProcessID()))})
+	cmd := buildCommandLine([]string{win32.ExePath(), "--clip-bridge",
+		"--expect-session", win32.Itoa(int(sid)), "--parent-pid", win32.Itoa(int(currentProcessID()))})
 	var pid uint32
 	if !launchInSession(sid, cmd, "", &pid) {
 		logWarn("子会话内剪贴板桥启动失败")
@@ -255,8 +256,8 @@ func (s *hostState) startSessionEntry() {
 		}
 		return
 	}
-	cmd := buildCommandLine([]string{exePath(), "--session-entry",
-		"--job", s.jobPath, "--expect-session", itoa(int(sid))})
+	cmd := buildCommandLine([]string{win32.ExePath(), "--session-entry",
+		"--job", s.jobPath, "--expect-session", win32.Itoa(int(sid))})
 	var pid uint32
 	if !launchInSession(sid, cmd, "", &pid) {
 		logError("Failed to start the session entry process in the child session.")
@@ -282,7 +283,7 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		win.SetTimer(hwnd, kTimerResize, 400, 0)
 		return 0
 	case win.WM_DPICHANGED:
-		if r := (*win.RECT)(unsafe.Pointer(lParam)); r != nil {
+		if r := ptrAt[win.RECT](lParam); r != nil {
 			win.SetWindowPos(hwnd, 0, r.Left, r.Top, r.Right-r.Left, r.Bottom-r.Top,
 				win.SWP_NOZORDER|win.SWP_NOACTIVATE)
 		}
@@ -292,7 +293,7 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	case win.WM_ERASEBKGND:
 		return 1
 	case win.WM_GETMINMAXINFO:
-		mmi := (*win.MINMAXINFO)(unsafe.Pointer(lParam))
+		mmi := ptrAt[win.MINMAXINFO](lParam)
 		mmi.PtMinTrackSize.X = 480
 		mmi.PtMinTrackSize.Y = 320
 		return 0
@@ -452,13 +453,13 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 		HInstance:     inst,
 		HCursor:       win.LoadCursor(0, win.MAKEINTRESOURCE(uintptr(win.IDC_ARROW))),
 		HbrBackground: win.HBRUSH(win.GetStockObject(win.BLACK_BRUSH)),
-		LpszClassName: utf16Ptr(className),
+		LpszClassName: win32.UTF16Ptr(className),
 	}
 	if win.RegisterClassEx(&wc) == 0 {
 		printErr("RegisterClassEx failed: " + formatWin32(uint32(win.GetLastError())))
 		return int(ExitError)
 	}
-	s.hwnd = win.CreateWindowEx(exStyle, utf16Ptr(className), utf16Ptr(opt.Title), style,
+	s.hwnd = win.CreateWindowEx(exStyle, win32.UTF16Ptr(className), win32.UTF16Ptr(opt.Title), style,
 		rc.Left, rc.Top, rc.Right-rc.Left, rc.Bottom-rc.Top, 0, 0, inst, nil)
 	if s.hwnd == 0 {
 		printErr("CreateWindowEx failed: " + formatWin32(uint32(win.GetLastError())))

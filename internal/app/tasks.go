@@ -9,6 +9,7 @@ import (
 
 	"localrdp/internal/i18n"
 	"localrdp/internal/store"
+	"localrdp/internal/win32"
 )
 
 // logMu serializes the writes to the log file, which the child processes
@@ -17,9 +18,9 @@ var logMu sync.Mutex
 
 // runLogging runs this program with args and returns its exit code.
 func runLogging(args ...string) int {
-	cmd := exec.Command(exePath(), args...)
-	cmd.Dir = exeDir()
-	hideWindow(cmd)
+	cmd := exec.Command(win32.ExePath(), args...)
+	cmd.Dir = win32.ExeDir()
+	win32.HideWindow(cmd)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return 1

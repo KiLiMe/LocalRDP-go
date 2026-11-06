@@ -1,6 +1,7 @@
-package main
+package rdp
 
 import (
+	"localrdp/internal/win32"
 	"syscall"
 	"unsafe"
 )
@@ -53,16 +54,16 @@ type processInformation struct {
 }
 
 const (
-	startfUseShowWindow         = 0x00000001
-	createUnicodeEnvironment    = 0x00000400
-	createNewConsole            = 0x00000010
-	createBreakawayFromJob      = 0x01000000
-	extendedStartupInfoPresent  = 0x00080000
-	procThreadAttributeParent   = 0x00020000
-	seDebugName                 = "SeDebugPrivilege"
-	seTcbName                   = "SeTcbPrivilege"
-	seAssignPrimaryTokenName    = "SeAssignPrimaryTokenPrivilege"
-	seIncreaseQuotaName         = "SeIncreaseQuotaPrivilege"
+	startfUseShowWindow        = 0x00000001
+	createUnicodeEnvironment   = 0x00000400
+	createNewConsole           = 0x00000010
+	createBreakawayFromJob     = 0x01000000
+	extendedStartupInfoPresent = 0x00080000
+	procThreadAttributeParent  = 0x00020000
+	seDebugName                = "SeDebugPrivilege"
+	seTcbName                  = "SeTcbPrivilege"
+	seAssignPrimaryTokenName   = "SeAssignPrimaryTokenPrivilege"
+	seIncreaseQuotaName        = "SeIncreaseQuotaPrivilege"
 )
 
 func scoreProcess(name string) int {
@@ -98,7 +99,7 @@ func runProcess(cmdLine, workDir string, flags uint32, env uintptr, si *startupI
 	cmd := utf16Slice(cmdLine)
 	var wd *uint16
 	if workDir != "" {
-		wd = utf16Ptr(workDir)
+		wd = win32.UTF16Ptr(workDir)
 	}
 	var r uintptr
 	var err error
@@ -133,7 +134,7 @@ func runProcessWithToken(token syscall.Token, cmdLine, workDir string, flags uin
 	cmd := utf16Slice(cmdLine)
 	var wd *uint16
 	if workDir != "" {
-		wd = utf16Ptr(workDir)
+		wd = win32.UTF16Ptr(workDir)
 	}
 	r, _, err := procCreateProcessWithTokenW.Call(uintptr(token), 1 /*LOGON_WITH_PROFILE*/, 0,
 		uintptr(unsafe.Pointer(&cmd[0])), uintptr(flags), env,
@@ -155,7 +156,7 @@ func launchWithPrimaryToken(token syscall.Token, cmdLine, workDir string, pid *u
 	procCreateEnvironmentBlock.Call(uintptr(unsafe.Pointer(&env)), uintptr(token), 0)
 	si := startupInfoEx{}
 	si.StartupInfo.Cb = uint32(unsafe.Sizeof(si))
-	si.StartupInfo.Desktop = utf16Ptr("winsta0\\default")
+	si.StartupInfo.Desktop = win32.UTF16Ptr("winsta0\\default")
 	si.StartupInfo.Flags = startfUseShowWindow
 	si.StartupInfo.ShowWindow = 1 // SW_SHOWNORMAL
 	id, errno := runProcess(cmdLine, workDir,
@@ -367,6 +368,7 @@ func openSessionProcess(sessionID uint32) syscall.Handle {
 	logWarn(sprintf("OpenProcess pid=%d failed", bestPID))
 	return 0
 }
+
 // launchInSession mirrors session_launch.cpp: WTS token → process token → parent attribute.
 func launchInSession(sessionID uint32, command, workDir string, pidOut *uint32) bool {
 	if command == "" || sessionID == kNoSession {

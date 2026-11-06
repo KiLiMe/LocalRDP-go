@@ -1,32 +1,34 @@
-package main
+package rdp
 
 import (
 	"syscall"
 	"unsafe"
+
+	"localrdp/internal/win32"
 )
 
 var (
-	procRegGetValueW            = advapi32.NewProc("RegGetValueW")
-	procOpenSCManagerW          = advapi32.NewProc("OpenSCManagerW")
-	procOpenServiceW            = advapi32.NewProc("OpenServiceW")
-	procQueryServiceStatusEx    = advapi32.NewProc("QueryServiceStatusEx")
-	procCloseServiceHandle      = advapi32.NewProc("CloseServiceHandle")
-	procRegOpenKeyExW           = advapi32.NewProc("RegOpenKeyExW")
-	procRegCloseKey             = advapi32.NewProc("RegCloseKey")
-	procWTSIsChildSessions      = wtsapi32.NewProc("WTSIsChildSessionsEnabled")
-	procWTSGetChildSessionId    = wtsapi32.NewProc("WTSGetChildSessionId")
-	procWTSEnableChildSessions  = wtsapi32.NewProc("WTSEnableChildSessions")
-	procWTSLogoffSession        = wtsapi32.NewProc("WTSLogoffSession")
-	procWTSEnumerateProcessesW  = wtsapi32.NewProc("WTSEnumerateProcessesW")
-	procWTSQueryUserToken       = wtsapi32.NewProc("WTSQueryUserToken")
-	procWTSFreeMemory           = wtsapi32.NewProc("WTSFreeMemory")
+	procRegGetValueW           = advapi32.NewProc("RegGetValueW")
+	procOpenSCManagerW         = advapi32.NewProc("OpenSCManagerW")
+	procOpenServiceW           = advapi32.NewProc("OpenServiceW")
+	procQueryServiceStatusEx   = advapi32.NewProc("QueryServiceStatusEx")
+	procCloseServiceHandle     = advapi32.NewProc("CloseServiceHandle")
+	procRegOpenKeyExW          = advapi32.NewProc("RegOpenKeyExW")
+	procRegCloseKey            = advapi32.NewProc("RegCloseKey")
+	procWTSIsChildSessions     = wtsapi32.NewProc("WTSIsChildSessionsEnabled")
+	procWTSGetChildSessionId   = wtsapi32.NewProc("WTSGetChildSessionId")
+	procWTSEnableChildSessions = wtsapi32.NewProc("WTSEnableChildSessions")
+	procWTSLogoffSession       = wtsapi32.NewProc("WTSLogoffSession")
+	procWTSEnumerateProcessesW = wtsapi32.NewProc("WTSEnumerateProcessesW")
+	procWTSQueryUserToken      = wtsapi32.NewProc("WTSQueryUserToken")
+	procWTSFreeMemory          = wtsapi32.NewProc("WTSFreeMemory")
 )
 
 const (
-	hkeyLocalMachine = 0x80000002
-	hkeyClassesRoot  = 0x80000000
-	serviceQueryStatus = 0x0004
-	scManagerConnect   = 0x0001
+	hkeyLocalMachine    = 0x80000002
+	hkeyClassesRoot     = 0x80000000
+	serviceQueryStatus  = 0x0004
+	scManagerConnect    = 0x0001
 	scStatusProcessInfo = 0
 )
 
@@ -34,8 +36,8 @@ func readRegSz(root uintptr, sub, name string) string {
 	buf := make([]uint16, 256)
 	cb := uint32(len(buf) * 2)
 	var typ uint32
-	r, _, _ := procRegGetValueW.Call(root, uintptr(unsafe.Pointer(utf16Ptr(sub))),
-		uintptr(unsafe.Pointer(utf16Ptr(name))), 0x00000002|0x00000004 /*SZ|EXPAND_SZ*/,
+	r, _, _ := procRegGetValueW.Call(root, uintptr(unsafe.Pointer(win32.UTF16Ptr(sub))),
+		uintptr(unsafe.Pointer(win32.UTF16Ptr(name))), 0x00000002|0x00000004, /*SZ|EXPAND_SZ*/
 		uintptr(unsafe.Pointer(&typ)), uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&cb)))
 	if r != 0 {
 		return ""
@@ -47,8 +49,8 @@ func readRegDword(root uintptr, sub, name string, def uint32) uint32 {
 	v := def
 	cb := uint32(4)
 	var typ uint32
-	r, _, _ := procRegGetValueW.Call(root, uintptr(unsafe.Pointer(utf16Ptr(sub))),
-		uintptr(unsafe.Pointer(utf16Ptr(name))), 0x00000010 /*DWORD*/,
+	r, _, _ := procRegGetValueW.Call(root, uintptr(unsafe.Pointer(win32.UTF16Ptr(sub))),
+		uintptr(unsafe.Pointer(win32.UTF16Ptr(name))), 0x00000010, /*DWORD*/
 		uintptr(unsafe.Pointer(&typ)), uintptr(unsafe.Pointer(&v)), uintptr(unsafe.Pointer(&cb)))
 	if r != 0 {
 		return def
@@ -74,7 +76,7 @@ func serviceRunning(name string) bool {
 		return false
 	}
 	defer procCloseServiceHandle.Call(scm)
-	svc, _, _ := procOpenServiceW.Call(scm, uintptr(unsafe.Pointer(utf16Ptr(name))),
+	svc, _, _ := procOpenServiceW.Call(scm, uintptr(unsafe.Pointer(win32.UTF16Ptr(name))),
 		serviceQueryStatus)
 	if svc == 0 {
 		return false
@@ -90,7 +92,7 @@ func serviceRunning(name string) bool {
 func clsidRegistered(clsid string) bool {
 	var h uintptr
 	r, _, _ := procRegOpenKeyExW.Call(hkeyClassesRoot,
-		uintptr(unsafe.Pointer(utf16Ptr("CLSID\\"+clsid))), 0, 0x00020019 /*KEY_READ*/,
+		uintptr(unsafe.Pointer(win32.UTF16Ptr("CLSID\\"+clsid))), 0, 0x00020019, /*KEY_READ*/
 		uintptr(unsafe.Pointer(&h)))
 	if r != 0 {
 		return false
@@ -118,11 +120,6 @@ func insideChildSession() bool {
 	mine := currentSessionID()
 	child := getChildSessionID()
 	return child != kNoSession && child != 0 && child == mine
-}
-
-func hasActiveChildSession() bool {
-	id := getChildSessionID()
-	return id != kNoSession && id != 0
 }
 
 type winStationCreateChildTransportFn func(*uint16, int32) int32
@@ -228,11 +225,11 @@ func printStatus(r EnvReport) {
 	line("RdpListenerEnabled", yn(r.RdpListenerEnabled))
 	line("RdpControlRegistered", yn(r.RdpControlOK))
 	line("InsideChildSession", yn(r.InsideChildSession))
-	line("CurrentSessionId", itoa(int(r.CurrentSessionID)))
+	line("CurrentSessionId", win32.Itoa(int(r.CurrentSessionID)))
 	if r.ChildSessionID == kNoSession {
 		line("ChildSessionId", "(none)")
 	} else {
-		line("ChildSessionId", itoa(int(r.ChildSessionID)))
+		line("ChildSessionId", win32.Itoa(int(r.ChildSessionID)))
 	}
 	line("Transport", sprintf("0x%08X", r.TransportStatus)+" ("+describeTransport(r.TransportStatus)+")")
 	if r.TransportPipe != "" {
