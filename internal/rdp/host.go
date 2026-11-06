@@ -77,7 +77,7 @@ func applyDisplay(s *hostState) bool {
 	if s.host == nil || s.host.disp == nil || !s.loggedIn {
 		return false
 	}
-	w, h := clientDesktopSize(s.hwnd)
+	w, h := desktopSize(s.hwnd, &s.opt)
 	ds, dev := resolveScale(s.hwnd, &s.opt)
 	if s.sizeMode != store.SizeFit {
 		if s.baseW <= 0 || s.baseH <= 0 {
@@ -216,7 +216,7 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		printOut("Connected.")
 		logInfo("Connected.")
 		if s.baseW == 0 {
-			s.baseW, s.baseH = clientDesktopSize(s.hwnd)
+			s.baseW, s.baseH = desktopSize(s.hwnd, &s.opt)
 			s.baseScale, _ = resolveScale(s.hwnd, &s.opt)
 			logf("会话尺寸基准 %dx%d（size=%s）", s.baseW, s.baseH, s.sizeMode)
 		}
@@ -320,6 +320,10 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	}
 	switch msg {
 	case win.WM_SIZE:
+		if win.IsIconic(hwnd) {
+			// 最小化时客户区是 0，别拿它去改会话分辨率。
+			return 0
+		}
 		s.resizeAx()
 		if s.sizeMode == store.SizeFixed {
 			// 固定大小：窗口动不了，画面也不用重设。
@@ -328,7 +332,7 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		win.SetTimer(hwnd, kTimerResize, 400, 0)
 		return 0
 	case win.WM_DPICHANGED:
-		if s.sizeMode == store.SizeFixed {
+		if s.sizeMode == store.SizeFixed || win.IsIconic(hwnd) {
 			return 0
 		}
 		if r := ptrAt[win.RECT](lParam); r != nil {

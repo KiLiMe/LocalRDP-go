@@ -235,6 +235,20 @@ func clientDesktopSize(hwnd win.HWND) (int32, int32) {
 	return w, h
 }
 
+// desktopSize is the size of the client area, or what the caller asked for
+// while the window is minimized or not laid out yet: a window started with
+// --minimized reports 0x0, and the session would open at 200x200.
+func desktopSize(hwnd win.HWND, opt *StartOptions) (int32, int32) {
+	w, h := clientDesktopSize(hwnd)
+	if w >= 480 && h >= 320 {
+		return w, h
+	}
+	if opt != nil && opt.Width >= 480 && opt.Height >= 320 {
+		return int32(opt.Width), int32(opt.Height)
+	}
+	return 1280, 800
+}
+
 func resolveScale(hwnd win.HWND, opt *StartOptions) (int32, int32) {
 	pct := int32(opt.Scale)
 	if pct <= 0 {
@@ -268,7 +282,7 @@ func deviceScaleFor(pct int32) int32 {
 // configure 对应 src/rdp_host.cpp 的 ConfigureControl()。
 func (h *axHost) configure(opt *StartOptions) bool {
 	d := disp{h.disp}
-	desk_w, desk_h := clientDesktopSize(h.hwnd)
+	desk_w, desk_h := desktopSize(h.hwnd, opt)
 	put := func(name string, v variant) uintptr {
 		hr := d.put(name, v)
 		if hr != hrOK {
