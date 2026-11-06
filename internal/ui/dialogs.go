@@ -77,22 +77,6 @@ func (st *State) closeDialog(c *myui.Context) {
 	})
 }
 
-// aboutDialog is what the program is.
-func (st *State) aboutDialog(c *myui.Context) {
-	t := c.Theme()
-	myui.Modal(c, &st.About, func() {
-		st.dialog(c, T("About LocalRDP"), func() {
-			myui.Text(c, "LocalRDP "+Version).FontSize(14).Bold().TextColor(t.Text)
-			myui.Text(c, T("A child session of this account, in a window of its own.")).
-				FontSize(12).TextColor(t.TextMuted).Wrap()
-			myui.Text(c, T("Made with mygo")).FontSize(11).TextColor(t.TextMuted)
-			myui.Row(c).Justify(myui.End).Children(func() {
-				myui.Button(c, T("Close")).OnClick(func() { st.About = false })
-			})
-		})
-	})
-}
-
 // dialog is the card every dialog is made of.
 func (st *State) dialog(c *myui.Context, title string, body func()) {
 	t := c.Theme()

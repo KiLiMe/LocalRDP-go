@@ -1,4 +1,4 @@
-// Package ui draws the window: the band with its menus, the console of the
+// Package ui draws the window: the band at the top, the console of the
 // session form, the panel of what is open, and the log.
 //
 // It draws a State and does nothing else: a click calls an Actions method,
@@ -95,7 +95,6 @@ type State struct {
 	// picker's choice as it shows it.
 	Settings     store.Settings
 	SettingsOpen bool
-	About        bool
 
 	// SessionsOpen and CloseOpen show the lists of what is open.
 	SessionsOpen bool

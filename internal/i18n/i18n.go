@@ -15,18 +15,11 @@ var zh = map[string]string{
 	"LocalRDP console": "LocalRDP 控制台",
 
 	// The band.
-	"File":                 "文件",
-	"View":                 "视图",
-	"Help":                 "帮助",
-	"New session…":         "新会话…",
-	"Open current session": "打开当前配置",
-	"Quit":                 "退出",
-	"Console":              "控制台",
-	"Settings…":            "设置…",
-	"About LocalRDP":       "关于 LocalRDP",
-	"Host window":          "宿主窗口",
-	"Bridge":               "桥",
-	"About bridge":         "关于桥",
+	"New session…": "新会话…",
+	"Settings":     "设置",
+	"Host window":  "宿主窗口",
+	"Bridge":       "桥",
+	"About bridge": "关于桥",
 
 	// The console: the session form and what it does.
 	"Session":            "会话",

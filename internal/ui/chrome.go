@@ -1,13 +1,13 @@
-// chrome.go is the window's frame: its own title bar, the menus at the
-// left of it, the window buttons, and the rail of sessions under it.
+// chrome.go is the window's frame: its own title bar, the window buttons,
+// and the rail of sessions under it.
 package ui
 
 import (
 	myui "github.com/egoist/mygo/ui"
 )
 
-// titleBar is the strip above the window: the name, the menus, and the
-// window buttons, which the window itself moves the window by.
+// titleBar is the strip above the window: the name, and the window
+// buttons, which the window itself moves the window by.
 func (st *State) titleBar(c *myui.Context) {
 	t := c.Theme()
 	bar := c.TitleBar()
@@ -17,8 +17,8 @@ func (st *State) titleBar(c *myui.Context) {
 		BorderWidth(0, 0, 0, 1).BorderColor(t.Border).DragWindow().Children(func() {
 		myui.Icon(c, iconApp.svg).Size(18, 18).TextColor(t.Accent)
 		myui.Text(c, "LocalRDP").FontSize(13).Bold().TextColor(t.Text).DragWindow()
-		myui.Box(c).Width(6)
-		st.menus(c)
+		myui.Box(c).Grow(1)
+		iconButton(c, iconSettings, T("Settings"), false, st.openSettings)
 	})
 }
 
@@ -29,62 +29,6 @@ func max32(a, b float32) float32 {
 	}
 	return b
 }
-
-// menus is File, Session, and Help; the items are drawn by the window,
-// so a frame of them is what they act on.
-func (st *State) menus(c *myui.Context) {
-	t := c.Theme()
-	menus := []struct {
-		label string
-		items func(m *myui.Menu)
-	}{
-		{T("File"), func(m *myui.Menu) {
-			m.Item(T("Settings…")).Chosen()
-			m.Separator()
-			m.Item(T("Open the data folder")).Chosen()
-			m.Separator()
-			m.Item(T("Quit")).Chosen()
-		}},
-		{T("View"), func(m *myui.Menu) {
-			m.Item(T("Refresh")).Chosen()
-			m.Item(T("Clear the log")).Chosen()
-		}},
-		{T("Session"), func(m *myui.Menu) {
-			m.Item(T("New session…")).Chosen()
-			m.Separator()
-			m.Item(T("Open child session")).Disabled(st.Busy).Chosen()
-			m.Item(T("Status")).Disabled(st.Busy).Chosen()
-			m.Item(T("Log off the child session")).Disabled(st.Busy || !st.Open).Chosen()
-			m.Separator()
-			m.Item(T("Grant privileges")).Disabled(st.Busy).Chosen()
-			m.Item(T("Forget password")).Disabled(st.Busy).Chosen()
-			m.Item(T("Shortcut")).Disabled(st.Busy).Chosen()
-		}},
-		{T("Help"), func(m *myui.Menu) {
-			m.Item(T("About LocalRDP")).Chosen()
-		}},
-	}
-	for _, menu := range menus {
-		label, items := menu.label, menu.items
-		myui.Text(c, label).FontSize(12).TextColor(t.TextMuted).Padding(6, 6).
-			Radius(4).Cursor(myui.CursorPointer).Menu(func(m *myui.Menu) {
-			items(m)
-			switch {
-			case m.Item(T("Settings…")).Chosen():
-				st.openSettings()
-			case m.Item(T("Open the data folder")).Chosen():
-				st.Act.Do(st.Act.OpenDataFolder)
-			case m.Item(T("Quit")).Chosen():
-				st.Act.Do(st.Act.Quit)
-			case m.Item(T("Clear the log")).Chosen():
-				st.Act.Do(st.Act.ClearLog)
-			}
-		})
-	}
-}
-
-// askClose closes the window, after asking when a session is open; the
-// menus and the shortcut use it.
 
 // rail is the column of sessions on the left, and the button that opens
 // a new one.

@@ -34,9 +34,6 @@ func (st *State) view(c *myui.Context) {
 	if st.CloseOpen {
 		st.closeDialog(c)
 	}
-	if st.About {
-		st.aboutDialog(c)
-	}
 }
 
 // sessionView is a session's tab: what it runs, and the buttons that act

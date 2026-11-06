@@ -7,12 +7,12 @@ func TestTranslatedStrings(t *testing.T) {
 	defer Set(old)
 
 	Set("zh")
-	if got := T("File"); got != "文件" {
-		t.Fatalf(`T("File") = %q in Chinese, want 文件`, got)
+	if got := T("Settings"); got != "设置" {
+		t.Fatalf(`T("Settings") = %q in Chinese, want 设置`, got)
 	}
 	Set("en")
-	if got := T("File"); got != "File" {
-		t.Fatalf(`T("File") = %q in English, want File`, got)
+	if got := T("Settings"); got != "Settings" {
+		t.Fatalf(`T("Settings") = %q in English, want Settings`, got)
 	}
 	if got := T("a string no one translated"); got != "a string no one translated" {
 		t.Fatalf("an unknown string was changed: %q", got)
