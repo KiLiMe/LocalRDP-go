@@ -22,7 +22,48 @@ var (
 	procWTSEnumerateProcessesW = wtsapi32.NewProc("WTSEnumerateProcessesW")
 	procWTSQueryUserToken      = wtsapi32.NewProc("WTSQueryUserToken")
 	procWTSFreeMemory          = wtsapi32.NewProc("WTSFreeMemory")
+
+	procWTSEnumerateSessionsW = wtsapi32.NewProc("WTSEnumerateSessionsW")
 )
+
+// WTS_CONNECTSTATE_CLASS 里用得到的几个值。
+const (
+	wtsStateDisconnected = 4
+	wtsStateDown         = 8
+)
+
+// wtsSessionInfo 是 WTS_SESSION_INFO。
+type wtsSessionInfo struct {
+	SessionID      uint32
+	WinStationName *uint16
+	State          int32
+}
+
+// wtsSessions 列出本机的 WTS 会话。
+func wtsSessions() []wtsSessionInfo {
+	var p *wtsSessionInfo
+	var count uint32
+	r, _, _ := procWTSEnumerateSessionsW.Call(0, 0, 1,
+		uintptr(unsafe.Pointer(&p)), uintptr(unsafe.Pointer(&count)))
+	if r == 0 || p == nil {
+		return nil
+	}
+	defer procWTSFreeMemory.Call(uintptr(unsafe.Pointer(p)))
+	out := make([]wtsSessionInfo, int(count))
+	copy(out, unsafe.Slice(p, int(count)))
+	return out
+}
+
+// sessionAlive 判断会话是否仍然真实存在。子会话注销之后
+// WTSGetChildSessionId 还会返回旧 id，只有枚举结果算数。
+func sessionAlive(id uint32) bool {
+	for _, s := range wtsSessions() {
+		if s.SessionID == id && s.State != wtsStateDown {
+			return true
+		}
+	}
+	return false
+}
 
 const (
 	hkeyLocalMachine    = 0x80000002

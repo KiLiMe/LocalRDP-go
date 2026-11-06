@@ -20,6 +20,11 @@ var (
 	iidNs4                    = iid(0xF50FA8AA, 0x1C7D, 0x4F59, 0xB1, 0x5C, 0xA9, 0x0C, 0xAC, 0xAE, 0x1F, 0xCB)
 	iidNs5                    = iid(0x4F6996D5, 0xD7B1, 0x412C, 0xB0, 0xFF, 0x06, 0x37, 0x18, 0x56, 0x69, 0x07)
 	iidDriveCollection        = iid(0x7FF17599, 0xDA2C, 0x4677, 0xAD, 0x35, 0xF6, 0x0C, 0x04, 0xFE, 0x15, 0x85)
+	iidTscNonScriptable       = iid(0xC1E6743A, 0x41C1, 0x4A74, 0x83, 0x2A, 0x0D, 0xD0, 0x6C, 0x1C, 0x7A, 0x0E)
+)
+
+const (
+	nsPutClearTextPassword = 3 // IMsTscNonScriptable::put_ClearTextPassword
 )
 
 // IMsRdpClientNonScriptable3 的 vtable 下标（IUnknown 3 + IMsTscNonScriptable 10 +
@@ -39,6 +44,11 @@ const (
 	ns4PutWarnAboutPrinterRedirection     = 43
 	ns4PutLaunchedViaClientShellInterface = 49
 	ns4PutTrustedZoneSite                 = 51
+)
+
+// IMsRdpClientNonScriptable5 从 53 起，AllowPromptingForCredentials 是它的第 11 个方法。
+const (
+	ns5PutAllowPromptingForCredentials = 63
 )
 
 // IMsRdpDriveCollection：RescanDrives=3, get_DriveByIndex=4, get_DriveCount=5
@@ -115,6 +125,20 @@ func (h *axHost) getExtended(name string) (variant, uintptr) {
 	win.SysFreeString(b)
 	syscall.SyscallN(vtb.Release, uintptr(p))
 	return out, r
+}
+
+// putClearTextPassword 通过 IMsTscNonScriptable 的 vtable 把密码交给控件。
+// 这是唯一能让子会话自动登录的路径：该属性既不在 AdvancedSettings 上，
+// 也不在主 IDispatch 的名字表里，晚期绑定只会拿到 0x80020006。
+func (h *axHost) putClearTextPassword(pw string) uintptr {
+	ns := qi(h.ctrl, &iidTscNonScriptable)
+	if ns == nil {
+		return hrNoInterface
+	}
+	defer vtCall(ns, 2)
+	b := win.SysAllocString(pw)
+	defer win.SysFreeString(b)
+	return vtCall(ns, nsPutClearTextPassword, uintptr(unsafe.Pointer(b)))
 }
 
 // ---------------------------------------------------------------- 驱动重定向
@@ -323,23 +347,32 @@ func (h *axHost) configure(opt *StartOptions) bool {
 	advPut("GrabFocusOnConnect", varBool(!opt.ViewOnly && !opt.Hidden))
 	advPut("allowBackgroundInput", varI4(0))
 	advPut("NegotiateSecurityLayer", varBool(true))
-	put("PromptForCredentials", varBool(false))
+	// 凭据本身与“要不要弹凭据框”都只能走非脚本接口的 vtable。
+	if ns3 := qi(h.ctrl, &iidNs3); ns3 != nil {
+		hr := vtCall(ns3, nsPutPromptForCredentials, boolArg(false))
+		logf("PromptForCredentials=false hr=%s", formatHr(uint32(hr)))
+		vtCall(ns3, 2)
+	} else {
+		logWarn("QI IMsRdpClientNonScriptable3 失败：关不掉凭据提示")
+	}
 
-	// ns5 只在 OCX 上，需要先 QI 再取 IDispatch。
 	if ns5 := qi(h.ctrl, &iidNs5); ns5 != nil {
-		if di := qi(ns5, &win.IID_IDispatch); di != nil {
-			if hr := (disp{di}).put("AllowPromptingForCredentials", varBool(false)); hr != hrOK {
-				logf("AllowPromptingForCredentials 失败 %s", formatHr(uint32(hr)))
-			}
-		}
+		hr := vtCall(ns5, ns5PutAllowPromptingForCredentials, boolArg(false))
+		logf("AllowPromptingForCredentials=false hr=%s", formatHr(uint32(hr)))
 		vtCall(ns5, 2)
 	}
 
 	if opt.User != "" {
 		put("UserName", varBstr(opt.User))
-		if opt.Password != "" {
-			advPut("ClearTextPassword", varBstr(opt.Password))
+	}
+	if opt.Password != "" {
+		hr := h.putClearTextPassword(opt.Password)
+		logf("ClearTextPassword（长度 %d）hr=%s", len(opt.Password), formatHr(uint32(hr)))
+		if hrFailed(hr) {
+			logWarn("密码没能交给 RDP 控件，子会话会停在登录页")
 		}
+	} else if opt.User != "" {
+		logWarn("没有密码：子会话会停在登录页（用 --password-env，或在界面里保存密码）")
 	}
 	if sec != nil {
 		if hr := (disp{sec}).put("KeyboardHookMode", varI4(1)); hr != hrOK {

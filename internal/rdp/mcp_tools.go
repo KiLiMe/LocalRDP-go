@@ -17,7 +17,6 @@ import (
 
 // Windows pieces the tools need beyond what the host already binds.
 var (
-	procWTSEnumerateSessionsW       = wtsapi32.NewProc("WTSEnumerateSessionsW")
 	procWTSQuerySessionInformationW = wtsapi32.NewProc("WTSQuerySessionInformationW")
 	// CreateToolhelp32Snapshot / Process32FirstW / Process32NextW and
 	// processEntry32W already live in session_launch.go.
@@ -32,12 +31,6 @@ const (
 	logDefaultLines     = 120
 	logMaxLines         = 5000
 )
-
-type wtsSessionInfo struct {
-	SessionID      uint32
-	WinStationName *uint16
-	State          int32
-}
 
 var wtsStateNames = map[int32]string{
 	0: "active", 1: "connected", 2: "connect-query", 3: "shadow", 4: "disconnected",
@@ -64,6 +57,7 @@ func mcpStatusJSON() (map[string]any, error) {
 		"inside_child_session":   r.InsideChildSession,
 		"current_session_id":     int(r.CurrentSessionID),
 		"child_session_id":       child,
+		"child_session_alive":    r.ChildSessionID != kNoSession && sessionAlive(r.ChildSessionID),
 		"transport":              sprintf("0x%08X", r.TransportStatus),
 		"transport_state":        describeTransport(r.TransportStatus),
 		"transport_pipe":         r.TransportPipe,
@@ -138,15 +132,8 @@ func containsFold(s, sub string) bool {
 
 // mcpSessions lists the Windows sessions (qwinsta without the console).
 func mcpSessions() ([]map[string]any, error) {
-	var p *wtsSessionInfo
-	var count uint32
-	r, _, err := procWTSEnumerateSessionsW.Call(0, 0, 1, uintptr(unsafe.Pointer(&p)), uintptr(unsafe.Pointer(&count)))
-	if r == 0 {
-		return nil, err
-	}
-	defer procWTSFreeMemory.Call(uintptr(unsafe.Pointer(p)))
-	items := unsafe.Slice(p, int(count))
-	out := make([]map[string]any, 0, count)
+	items := wtsSessions()
+	out := make([]map[string]any, 0, len(items))
 	for i := range items {
 		it := items[i]
 		name := ""

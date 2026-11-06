@@ -13,6 +13,9 @@ const (
 	vtBstr = 8
 	vtDisp = 9
 	vtBool = 11
+	vtUi4  = 19
+	vtI8   = 20
+	vtUi8  = 21
 
 	dispatchMethod     = 1
 	dispatchPropGet    = 2
@@ -164,6 +167,12 @@ func variantString(v *variant) string {
 			return "\"\""
 		}
 		return "\"" + win.BSTRToString((*uint16)(u2p(v.val))) + "\""
+	case vtUi4:
+		return itoa64(int64(uint32(v.val)))
+	case vtI8:
+		return itoa64(int64(v.val))
+	case vtUi8:
+		return itoa64(int64(v.val))
 	default:
 		return "vt=" + itoa64(int64(v.VT))
 	}
