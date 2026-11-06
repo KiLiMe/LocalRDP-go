@@ -46,8 +46,16 @@ protocol `2025-06-18`，零第三方依赖），AI 客户端可直接读状态�
 ```
 
 工具：`lrdp_status`、`lrdp_log`、`lrdp_sessions`、`lrdp_processes`、`lrdp_diag`、
-`lrdp_desktop`、`lrdp_start`、`lrdp_stop`；资源：`localrdp://status`、`localrdp://log`。
+`lrdp_desktop`、`lrdp_start`、`lrdp_stop`、`lrdp_click`；资源：`localrdp://status`、`localrdp://log`。
 详见 [使用说明.md 第 12 节](使用说明.md)。
+
+不开鼠标也能按按钮：每个界面按钮都有命令行入口，`localrdp click --list` 全部列出。
+
+```pwsh
+localrdp click fullscreen     # 会话窗口顶栏：全屏 / 退出全屏
+localrdp click reconnect      # 会话窗口顶栏：重连
+localrdp click open           # 主窗口：打开子会话
+```
 
 ## 能力矩阵
 

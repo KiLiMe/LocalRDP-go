@@ -4,6 +4,7 @@ import (
 	"os"
 	"runtime"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/lxn/win"
@@ -23,6 +24,9 @@ const (
 
 	wmRdpDisconnected = win.WM_APP + 1
 	className         = "LocalRDP.Host"
+
+	// hotkeyFullScreen is the id of the Ctrl+Alt+F hot key this window claims.
+	hotkeyFullScreen = 1
 )
 
 type hostState struct {
@@ -45,7 +49,8 @@ type hostState struct {
 
 	appliedW, appliedH, appliedScale int
 	// retrying is set while a reconnect is between Disconnect and Connect.
-	retrying bool
+	retrying   bool
+	lastToggle time.Time
 	// sizeMode is store.SizeFit, SizeFixed or SizeScale: what the window
 	// does with its size while the session runs.
 	sizeMode string
@@ -71,6 +76,16 @@ type hostState struct {
 }
 
 var gHost *hostState
+
+// viewSize is the desktop the session should use now: the control's window,
+// which leaves the bar out (and the bar is hidden in full screen).
+func (s *hostState) viewSize() (int32, int32) {
+	hwnd := s.view
+	if hwnd == 0 {
+		hwnd = s.hwnd
+	}
+	return viewSize(hwnd, &s.opt)
+}
 
 func (s *hostState) resizeAx() {
 	if s.hwnd == 0 || s.host == nil {
@@ -104,7 +119,7 @@ func applyDisplay(s *hostState) bool {
 	if s.host == nil || s.host.disp == nil || !s.loggedIn {
 		return false
 	}
-	w, h := desktopSize(s.hwnd, &s.opt)
+	w, h := s.viewSize()
 	ds, dev := resolveScale(s.hwnd, &s.opt)
 	if s.sizeMode != store.SizeFit {
 		if s.baseW <= 0 || s.baseH <= 0 {
@@ -179,6 +194,29 @@ func clampI32(v, lo, hi int32) int32 {
 	return v
 }
 
+// toggleFullscreen flips full screen. Ctrl+Alt+F reaches both this window and
+// the control, which would otherwise toggle twice.
+func (s *hostState) toggleFullscreen() {
+	if !s.toggleAllowed() {
+		return
+	}
+	if s.fullscreen {
+		s.leaveFullscreen()
+		return
+	}
+	s.enterFullscreen()
+}
+
+// toggleAllowed says whether a toggle may happen now, remembering this one.
+func (s *hostState) toggleAllowed() bool {
+	now := time.Now()
+	if !s.lastToggle.IsZero() && now.Sub(s.lastToggle) < 400*time.Millisecond {
+		return false
+	}
+	s.lastToggle = now
+	return true
+}
+
 func (s *hostState) enterFullscreen() {
 	if s.hwnd == 0 || s.fullscreen {
 		return
@@ -203,7 +241,7 @@ func (s *hostState) enterFullscreen() {
 	s.resizeAx()
 	win.PostMessage(s.hwnd, win.WM_SIZE, 0, 0)
 	win.InvalidateRect(s.hwnd, nil, true)
-	logInfo("Fullscreen entered")
+	logInfo("Fullscreen entered（Ctrl+Alt+F 退出）")
 }
 
 func (s *hostState) leaveFullscreen() {
@@ -252,7 +290,7 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		logInfo("Connected.")
 		s.invalidateBar()
 		if s.baseW == 0 {
-			s.baseW, s.baseH = desktopSize(s.hwnd, &s.opt)
+			s.baseW, s.baseH = s.viewSize()
 			s.baseScale, _ = resolveScale(s.hwnd, &s.opt)
 			logf("会话尺寸基准 %dx%d（size=%s）", s.baseW, s.baseH, s.sizeMode)
 		}
@@ -295,10 +333,14 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		}
 	case 8: // OnEnterFullScreenMode
 		logInfo("OnRequestGoFullScreen")
-		s.enterFullscreen()
+		if s.toggleAllowed() {
+			s.enterFullscreen()
+		}
 	case 9: // OnLeaveFullScreenMode
 		logInfo("OnRequestLeaveFullScreen")
-		s.leaveFullscreen()
+		if s.toggleAllowed() {
+			s.leaveFullscreen()
+		}
 	case 10: // OnFatalError
 		code := arg(0)
 		logError("RDP fatal error " + win32.Itoa(int(code)))
@@ -386,7 +428,7 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		return 1
 	case win.WM_GETMINMAXINFO:
 		mmi := ptrAt[win.MINMAXINFO](lParam)
-		if s.sizeMode == store.SizeFixed && s.fixedW > 0 && s.fixedH > 0 {
+		if s.sizeMode == store.SizeFixed && !s.fullscreen && s.fixedW > 0 && s.fixedH > 0 {
 			// 固定大小：最小 = 最大，拖不动，也最大化不了。
 			mmi.PtMinTrackSize.X = s.fixedW
 			mmi.PtMinTrackSize.Y = s.fixedH
@@ -400,6 +442,21 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	case wmRdpDisconnected:
 		s.requestClose()
 		return 0
+	case win.WM_HOTKEY:
+		if int(wParam) == hotkeyFullScreen {
+			s.toggleFullscreen()
+		}
+		return 0
+	case win.WM_KEYDOWN, win.WM_SYSKEYDOWN:
+		if wParam == win.VK_ESCAPE && s.fullscreen {
+			s.leaveFullscreen()
+			return 0
+		}
+	case win.WM_SYSCOMMAND:
+		// 全屏时禁掉系统菜单（Alt+空格）与最大化，只留还原。
+		if s.fullscreen && (wParam&0xFFF0) == win.SC_MAXIMIZE {
+			return 0
+		}
 	case win.WM_TIMER:
 		switch wParam {
 		case kTimerWatchdog:
@@ -505,6 +562,7 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		}(hwnd)
 		return 0
 	case win.WM_DESTROY:
+		win32.UnregisterHotKey(uintptr(hwnd), hotkeyFullScreen)
 		// 只发退出信号；COM 对象在消息循环结束后再释放，
 		// 避免在控件自己的回调栈里 Release 导致卡死。
 		for _, id := range []uintptr{kTimerWatchdog, kTimerLaunch, kTimerQuit, kTimerResize, kTimerDisplay, kTimerClip, kTimerReconnect} {
@@ -635,14 +693,8 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 		return int(ExitError)
 	}
 	if opt.Fullscreen {
-		mon := win.MonitorFromWindow(s.hwnd, win.MONITOR_DEFAULTTONEAREST)
-		var mi win.MONITORINFO
-		mi.CbSize = uint32(unsafe.Sizeof(mi))
-		win.GetMonitorInfo(mon, &mi)
-		win.SetWindowPos(s.hwnd, 0, mi.RcMonitor.Left, mi.RcMonitor.Top,
-			mi.RcMonitor.Right-mi.RcMonitor.Left, mi.RcMonitor.Bottom-mi.RcMonitor.Top,
-			win.SWP_NOZORDER)
-		s.fullscreen = true
+		// 走同一条路，才能记住原样式/位置，Ctrl+Alt+F 才退得回来。
+		s.enterFullscreen()
 	}
 	win.ShowWindow(s.hwnd, show)
 	if show != int32(win.SW_HIDE) && !win.IsWindowVisible(s.hwnd) {
@@ -653,6 +705,9 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 		win.SetForegroundWindow(s.hwnd)
 	}
 	win.UpdateWindow(s.hwnd)
+	if !win32.RegisterHotKey(uintptr(s.hwnd), hotkeyFullScreen, win32.ModControl|win32.ModAlt|win32.ModNoRepeat, 'F') {
+		logWarn("Ctrl+Alt+F 热键注册失败，只能用顶栏按钮切全屏")
+	}
 
 	// 抽干一次消息队列，避免尺寸消息早于控件创建到达。
 	var msg win.MSG

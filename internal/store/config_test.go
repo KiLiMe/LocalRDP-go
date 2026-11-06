@@ -131,3 +131,17 @@ func TestLoadSettingsFallsBackWhenMissing(t *testing.T) {
 		t.Fatalf("a fresh install has timeout %d, want %d", got.Last.Timeout, DefaultTimeout)
 	}
 }
+
+func TestKnownGuiCommand(t *testing.T) {
+	if !KnownGuiCommand("open") {
+		t.Fatal("open should be a button of the window")
+	}
+	if KnownGuiCommand("nonsense") {
+		t.Fatal("nonsense is not a button")
+	}
+	for _, name := range GuiCommands {
+		if name != strings.ToLower(name) || strings.TrimSpace(name) != name {
+			t.Fatalf("button name %q must be lowercase and trimmed", name)
+		}
+	}
+}

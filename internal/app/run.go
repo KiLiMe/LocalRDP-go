@@ -46,6 +46,7 @@ func Run(opts Options) int {
 		launched = true
 		a.Win = win
 		win.OnClosed(a.shutdown)
+		a.watchCommands()
 		a.Do(func() {
 			a.St.Open = false
 			a.St.Log = tailLog(200)

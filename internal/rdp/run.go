@@ -23,6 +23,7 @@ func printHelp() {
 	printOut("  localrdp stop")
 	printOut("  localrdp gui [options]")
 	printOut("  localrdp mcp")
+	printOut("  localrdp click <button> [--pid N]   Press a button without a mouse")
 	printOut("  localrdp help")
 	printOut("")
 	printOut("Options (start / desktop):")
@@ -158,10 +159,13 @@ func Run(args []string) int {
 	if eqFold(verb, "mcp") {
 		return cmdMcp(args[2:])
 	}
+	if eqFold(verb, "click") {
+		return cmdClick(args[2:])
+	}
 	opt := defaultOptions()
 	var programArgs []string
 	afterDash := false
-	optionsAllowed := eqFold(verb, "start") || eqFold(verb, "desktop")
+	optionsAllowed := eqFold(verb, "start") || eqFold(verb, "desktop") || eqFold(verb, "click")
 	if !optionsAllowed && len(args) > 2 {
 		printErr("`" + verb + "` does not accept options or arguments.")
 		return int(ExitError)

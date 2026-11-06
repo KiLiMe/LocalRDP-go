@@ -36,6 +36,8 @@ var (
 	procShowWindow               = user32.NewProc("ShowWindow")
 	procPostMessageW             = user32.NewProc("PostMessageW")
 	procSetForegroundWindow      = user32.NewProc("SetForegroundWindow")
+	procRegisterHotKey           = user32.NewProc("RegisterHotKey")
+	procUnregisterHotKey         = user32.NewProc("UnregisterHotKey")
 	procSwitchToThisWindow       = user32.NewProc("SwitchToThisWindow")
 	procFindWindowW              = user32.NewProc("FindWindowW")
 	kernel32                     = syscall.NewLazyDLL("kernel32.dll")
@@ -107,6 +109,43 @@ const (
 	CmdDisconnect      = 2
 	CmdFullScreen      = 3
 )
+
+// Hot key modifiers, for RegisterHotKey.
+const (
+	ModAlt      = 0x0001
+	ModControl  = 0x0002
+	ModShift    = 0x0004
+	ModNoRepeat = 0x4000
+)
+
+// RegisterHotKey claims a key combination for a window of this thread, which
+// WM_HOTKEY then reports even while another control has the focus.
+func RegisterHotKey(hwnd uintptr, id int, mods uint32, key uint32) bool {
+	ok, _, _ := procRegisterHotKey.Call(hwnd, uintptr(id), uintptr(mods), uintptr(key))
+	return ok != 0
+}
+
+// UnregisterHotKey gives the combination back.
+func UnregisterHotKey(hwnd uintptr, id int) {
+	procUnregisterHotKey.Call(hwnd, uintptr(id))
+}
+
+// HostProcess is the process that owns a session window, or 0. There is only
+// one child session at a time, so there is only one such window.
+func HostProcess() int {
+	var pid uint32
+	cb := syscall.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
+		var buf [64]uint16
+		n, _, _ := procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+		if n == 0 || syscall.UTF16ToString(buf[:n]) != HostClassName {
+			return 1
+		}
+		procGetWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+		return 0
+	})
+	procEnumWindows.Call(cb, 0)
+	return int(pid)
+}
 
 // BringToFront shows and focuses the host window of a child process. The
 // process is named instead of the title, because two sessions can share one.

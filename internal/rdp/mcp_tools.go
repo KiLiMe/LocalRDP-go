@@ -344,6 +344,18 @@ func mcpTools() []mcp.Tool {
 			},
 		},
 		{
+			Name:        "lrdp_click",
+			Title:       "Press a button",
+			Description: "Press a button of the window or of a session window without a mouse, as `localrdp click` does: fullscreen / reconnect / disconnect for the session window's bar, and the window's own buttons for the rest.",
+			Schema: mcp.ObjectSchema(map[string]any{
+				"button": mcp.Prop("string", "button name: fullscreen, reconnect, disconnect, open, status, stop, privilege, forget-password, data-folder, show, close-session, refresh, clear-log, copy-log"),
+				"pid":    mcp.Prop("integer", "session window process id (default: the one that is open)"),
+			}, []string{"button"}, false),
+			Run: func(args map[string]any) (string, error) {
+				return mcpClick(args)
+			},
+		},
+		{
 			Name:        "lrdp_stop",
 			Title:       "Log off the child session",
 			Description: "Log off the child session, as `localrdp stop` does.",
@@ -358,6 +370,32 @@ func mcpTools() []mcp.Tool {
 			},
 		},
 	}
+}
+
+// mcpClick presses a button, the way `localrdp click` does.
+func mcpClick(args map[string]any) (string, error) {
+	name := strings.ToLower(strings.TrimSpace(mcp.ArgString(args, "button", "")))
+	if name == "" {
+		return "", errString("button is required")
+	}
+	pid := int(mcp.ArgInt(args, "pid", 0, 0, 100000))
+	if cmd, ok := hostClicks[name]; ok {
+		if pid == 0 {
+			pid = win32.HostProcess()
+		}
+		if pid == 0 {
+			return mcp.JSON(map[string]any{"clicked": false, "reason": "no session window is open"})
+		}
+		ok := win32.PostCommand(pid, cmd)
+		return mcp.JSON(map[string]any{"clicked": ok, "button": name, "pid": pid})
+	}
+	if !win32.GuiRunning() {
+		return mcp.JSON(map[string]any{"clicked": false, "button": name, "reason": "the window is not open"})
+	}
+	if err := store.WriteGuiCommand(name); err != nil {
+		return mcp.JSON(map[string]any{"clicked": false, "button": name, "reason": err.Error()})
+	}
+	return mcp.JSON(map[string]any{"clicked": true, "button": name})
 }
 
 // mcpLaunch builds the command line for desktop/start and starts it detached.

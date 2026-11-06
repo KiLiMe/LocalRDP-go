@@ -44,6 +44,17 @@ func ClaimSingleInstance(name string) bool {
 	return true
 }
 
+// GuiRunning says whether the window is open. The class is enough: it is
+// ours and one per logon session.
+func GuiRunning() bool {
+	cls, err := syscall.UTF16PtrFromString(GuiClassName)
+	if err != nil {
+		return false
+	}
+	hwnd, _, _ := procFindWindowW.Call(uintptr(unsafe.Pointer(cls)), 0)
+	return hwnd != 0
+}
+
 // ActivateWindow shows and focuses the first window of a class and title.
 // The window of the app is named by both, because a second program of the
 // same class may belong to something else.

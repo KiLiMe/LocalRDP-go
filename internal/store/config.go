@@ -247,6 +247,59 @@ func SecretFile() string { return filepath.Join(Dir(), "cred.dat") }
 // LogFile is where the child processes' log goes.
 func LogFile() string { return filepath.Join(Dir(), "localrdp.log") }
 
+// CommandFile is where `localrdp click` leaves a button the window should
+// press. The window removes the file once it has done so.
+func CommandFile() string { return filepath.Join(Dir(), "command.txt") }
+
+// GuiCommands are the buttons of the window that can be pressed from
+// outside: the name `localrdp click` takes for each.
+var GuiCommands = []string{
+	"open",            // 打开子会话
+	"status",          // 状态
+	"stop",            // 注销子会话
+	"privilege",       // 授予特权
+	"forget-password", // 清理密码
+	"data-folder",     // 打开数据目录
+	"reconnect",       // 会话页的重连
+	"show",            // 会话页的显示窗口
+	"close-session",   // 会话页的关闭会话
+	"refresh",         // 刷新环境
+	"clear-log",       // 清空日志
+	"copy-log",        // 复制日志
+}
+
+// KnownGuiCommand says whether the window has a button of that name.
+func KnownGuiCommand(name string) bool {
+	for _, c := range GuiCommands {
+		if c == name {
+			return true
+		}
+	}
+	return false
+}
+
+// WriteGuiCommand asks the running window to press a button. The name is
+// checked against GuiCommands first.
+func WriteGuiCommand(name string) error {
+	if !KnownGuiCommand(name) {
+		return errUnknownCommand{name}
+	}
+	if err := os.MkdirAll(Dir(), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(CommandFile(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(name + "\n")
+	return err
+}
+
+type errUnknownCommand struct{ name string }
+
+func (e errUnknownCommand) Error() string { return "unknown command: " + e.name }
+
 // LoadSettings reads the settings, and a fresh set when there are none or
 // they can't be read: a broken file must not keep the window shut.
 func LoadSettings() Settings {
