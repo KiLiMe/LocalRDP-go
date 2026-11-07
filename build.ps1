@@ -4,11 +4,15 @@
     pwsh .\build.ps1            -> 编译到 build\bin\Release\localrdp.exe
     pwsh .\build.ps1 -Clean     -> 先删 build 目录再编译
     pwsh .\build.ps1 -Test      -> 编译前先跑 go vet 与 go test
+    pwsh .\build.ps1 -Version 2026.11.7.1
+                                -> 把版本号写进程序（`localrdp status` 与 MCP 的 server version）
+                                   发版时和 rsrc 的 file-version 用同一个四段数字
 #>
 [CmdletBinding()]
 param(
     [switch]$Clean,
-    [switch]$Test
+    [switch]$Test,
+    [string]$Version = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,11 +46,18 @@ try {
         & go test ./...
         if ($LASTEXITCODE -ne 0) { Write-Host '  [ERR] 测试失败。' -ForegroundColor Red; exit $LASTEXITCODE }
     }
-    & go build -trimpath -ldflags '-s -w -H=windowsgui' -o $Exe .
+    $ldflags = '-s -w -H=windowsgui'
+    if ($Version) {
+        # -X 只能改包级字符串变量，两个包各有一份，发版时一起改。
+        $ldflags += " -X localrdp/internal/rdp.versionString=$Version"
+        $ldflags += " -X localrdp/internal/ui.Version=$Version"
+    }
+    & go build -trimpath -ldflags $ldflags -o $Exe .
     if ($LASTEXITCODE -ne 0) { Write-Host '  [ERR] 编译失败。' -ForegroundColor Red; exit $LASTEXITCODE }
 } finally {
     Pop-Location
 }
 
 $size = [math]::Round((Get-Item -LiteralPath $Exe).Length / 1MB, 2)
-Write-Host "  [OK] $Exe ($size MB)" -ForegroundColor Green
+$ver = if ($Version) { " v$Version" } else { '' }
+Write-Host "  [OK] $Exe$ver ($size MB)" -ForegroundColor Green

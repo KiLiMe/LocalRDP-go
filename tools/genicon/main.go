@@ -8,7 +8,7 @@
 // go-winres turns that file into the resource object the linker embeds:
 //
 //	go-winres simply --icon winres/localrdp.ico --manifest none \
-//	    --product-name LocalRDP --file-version 1.0.0 --product-version 1.0.0
+//	    --product-name LocalRDP --file-version 2026.11.7.1 --product-version 2026.11.7.1
 package main
 
 import (

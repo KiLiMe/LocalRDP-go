@@ -7,10 +7,13 @@ import (
 	"unsafe"
 )
 
+// versionString is what the command line prints and what the MCP server calls
+// itself; build.ps1 -Version rewrites it at link time.
+var versionString = "1.0.0"
+
 const (
-	versionString = "1.0.0"
-	kNoSession    = 0xFFFFFFFF
-	cwUseDefault  = -2147483648 // CW_USEDEFAULT as LONG
+	kNoSession   = 0xFFFFFFFF
+	cwUseDefault = -2147483648 // CW_USEDEFAULT as LONG
 )
 
 // ExitCode mirrors the C++ ExitCode enum.
