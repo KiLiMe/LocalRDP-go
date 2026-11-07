@@ -11,7 +11,6 @@ var (
 	procEnumWindows             = user32.NewProc("EnumWindows")
 	procGetWindowTextW          = user32.NewProc("GetWindowTextW")
 	procGetWindowTextLengthW    = user32.NewProc("GetWindowTextLengthW")
-	procGetWindowTextLengthW    = user32.NewProc("GetWindowTextLengthW")
 	procMonitorFromPoint        = user32.NewProc("MonitorFromPoint")
 	procRemoveClipboardListener = user32.NewProc("RemoveClipboardFormatListener")
 	procCreateProcessAsUserW    = advapi32.NewProc("CreateProcessAsUserW")
