@@ -84,10 +84,15 @@ type State struct {
 	LogOpen bool
 
 	// Settings is what the app remembers about itself, and SettingsOpen
-	// whether its dialog shows. Dark is the theme, LangLabel the language
-	// picker's choice as it shows it.
-	Settings     store.Settings
-	SettingsOpen bool
+	// whether its dialog shows. SettingsDraft is what the dialog edits:
+	// it goes back to Settings when the dialog is cancelled.
+	Settings      store.Settings
+	SettingsDraft store.Settings
+	SettingsOpen  bool
+
+	// settingsShown is the dialog as the last frame saw it, so closing it
+	// without saving can put the language back.
+	settingsShown bool
 
 	// CloseOpen shows the question before the window closes a session.
 	CloseOpen bool

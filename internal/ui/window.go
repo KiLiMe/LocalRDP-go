@@ -25,7 +25,11 @@ func (st *State) view(c *myui.Context) {
 	})
 	if st.SettingsOpen {
 		st.settingsDialog(c)
+	} else if st.settingsShown {
+		// Closed without saving: the language tried on goes back.
+		setLang(st.Settings.Lang)
 	}
+	st.settingsShown = st.SettingsOpen
 	if st.CloseOpen {
 		st.closeDialog(c)
 	}
@@ -61,5 +65,9 @@ func (st *State) hasSession() bool {
 	return st.Active >= 0 && st.Active < len(st.Sessions)
 }
 
-// openSettings opens the settings dialog.
-func (st *State) openSettings() { st.SettingsOpen = true }
+// openSettings opens the settings dialog on a copy of what is saved, so
+// Cancel can put the language back.
+func (st *State) openSettings() {
+	st.SettingsDraft = st.Settings
+	st.SettingsOpen = true
+}

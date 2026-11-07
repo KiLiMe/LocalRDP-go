@@ -10,26 +10,36 @@ import (
 	myui "github.com/egoist/mygo/ui"
 )
 
-// settingsDialog is the settings: the language, and whether passwords
-// are kept.
+// settingsDialog is the settings: the language, and what the window keeps
+// between runs. It edits a draft, so Cancel leaves everything as it was.
 func (st *State) settingsDialog(c *myui.Context) {
+	t := c.Theme()
 	myui.Modal(c, &st.SettingsOpen, func() {
-		st.dialog(c, T("Settings"), func() {
-			lang := st.langIndex()
-			myui.Text(c, T("Language")).FontSize(12)
-			if myui.Segmented(c, &lang, "English", "中文").Changed() {
-				st.Settings.Lang = pickLang(lang)
+		d := &st.SettingsDraft
+		st.dialog(c, T("Settings"), T("Settings hint"), func() {
+			myui.Button(c, T("Cancel")).Height(30).OnClick(func() {
 				setLang(st.Settings.Lang)
-			}
-			myui.Checkbox(c, &st.Settings.SavePasswords, T("Keep passwords"))
-			myui.Checkbox(c, &st.Settings.Remember, T("Remember the last session"))
-			myui.Row(c).Gap(8).Justify(myui.End).Children(func() {
-				myui.Button(c, T("Cancel")).OnClick(func() { st.SettingsOpen = false })
-				myui.PrimaryButton(c, T("Save")).OnClick(func() {
-					st.Act.Do(st.Act.SaveSettings)
-					st.SettingsOpen = false
-				})
+				st.SettingsOpen = false
 			})
+			myui.PrimaryButton(c, T("Save")).Height(30).OnClick(func() {
+				st.Settings = *d
+				if !st.Settings.SavePasswords {
+					st.SavePassword = false
+				}
+				st.SettingsOpen = false
+				st.Act.Do(st.Act.SaveSettings)
+			})
+		}, func() {
+			myui.Text(c, T("Language")).FontSize(12).TextColor(t.TextMuted).Margin(16, 0, 6, 0)
+			lang := st.settingsLangIndex()
+			if myui.Segmented(c, &lang, "English", "中文").Height(30).Changed() {
+				d.Lang = pickLang(lang)
+				setLang(d.Lang)
+			}
+			myui.Divider(c).Margin(18, 0, 16, 0)
+			checkRow(c, &d.SavePasswords, T("Keep passwords"), T("Keep passwords hint"))
+			checkRow(c, &d.Remember, T("Remember the last session"), T("Remember hint")).
+				Margin(14, 0, 0, 0)
 		})
 	})
 }
@@ -37,34 +47,55 @@ func (st *State) settingsDialog(c *myui.Context) {
 // closeDialog asks before the window closes with a session open.
 func (st *State) closeDialog(c *myui.Context) {
 	myui.Modal(c, &st.CloseOpen, func() {
-		st.dialog(c, T("Close the window?"), func() {
-			myui.Text(c, T("A child session is open. Closing the window ends it.")).
-				FontSize(12).Wrap()
-			myui.Row(c).Gap(8).Justify(myui.End).Children(func() {
-				myui.Button(c, T("Cancel")).OnClick(func() { st.CloseOpen = false })
-				myui.PrimaryButton(c, T("Close")).OnClick(func() {
-					st.CloseOpen = false
-					st.quitting = true
-					st.Act.Do(st.Act.Quit)
-				})
+		st.dialog(c, T("Close the window?"), "", func() {
+			myui.Button(c, T("Cancel")).Height(30).OnClick(func() { st.CloseOpen = false })
+			myui.PrimaryButton(c, T("Close")).Height(30).OnClick(func() {
+				st.CloseOpen = false
+				st.quitting = true
+				st.Act.Do(st.Act.Quit)
 			})
+		}, func() {
+			myui.Text(c, T("A child session is open. Closing the window ends it.")).
+				FontSize(13).Wrap().Margin(14, 0, 0, 0)
 		})
 	})
 }
 
-// dialog is the card every dialog is made of.
-func (st *State) dialog(c *myui.Context, title string, body func()) {
+// dialog is the card every dialog is made of: a title with a line saying
+// what it is for, the body, and the buttons under a hairline. It is pulled
+// over the modal's own padding so the card is all that shows.
+func (st *State) dialog(c *myui.Context, title, hint string, foot func(), body func()) {
 	t := c.Theme()
-	myui.Column(c).Width(420).Padding(20).Gap(14).Radius(12).
-		Background(t.Surface).Border(1, t.Border).Shadow(0, 8, 24, 0, myui.RGBA(0, 0, 0, 0.28)).Children(func() {
-		myui.Text(c, title).FontSize(16).Bold().TextColor(t.Text)
-		body()
+	myui.Column(c).Width(440).Margin(-20).Radius(10).Background(t.Surface).Border(1, t.Border).
+		Shadow(0, 12, 32, 0, myui.RGBA(0, 0, 0, 0.22)).Children(func() {
+		myui.Column(c).Padding(22, 24, 2, 24).Gap(3).Children(func() {
+			myui.Text(c, title).FontSize(17).Bold().TextColor(t.Text)
+			if hint != "" {
+				myui.Text(c, hint).FontSize(12).TextColor(t.TextMuted).Wrap()
+			}
+		})
+		myui.Column(c).Padding(0, 24, 14, 24).Children(body)
+		myui.Column(c).Children(func() {
+			myui.Divider(c)
+			myui.Row(c).Padding(14, 20, 16, 20).Gap(8).Justify(myui.End).
+				Background(t.SurfaceHover).Radius(0, 0, 10, 10).Children(foot)
+		})
 	})
 }
 
-// langIndex is the segment the settings show.
-func (st *State) langIndex() int {
-	if st.Settings.Lang == "zh" {
+// checkRow is a checkbox with a line saying what it does under it.
+func checkRow(c *myui.Context, v *bool, label, hint string) myui.Element {
+	t := c.Theme()
+	return myui.Column(c).Gap(2).Children(func() {
+		myui.Checkbox(c, v, label)
+		myui.Text(c, hint).FontSize(11).TextColor(t.TextMuted).Wrap().Padding(0, 0, 0, 26)
+	})
+}
+
+// settingsLangIndex is the segment the settings show, from the draft, so
+// the choice can be dropped again without touching what is saved.
+func (st *State) settingsLangIndex() int {
+	if st.SettingsDraft.Lang == "zh" {
 		return 1
 	}
 	return 0
