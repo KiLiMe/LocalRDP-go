@@ -193,8 +193,6 @@ func (st *State) optionCard(c *myui.Context) {
 		st.field(c, "timeout", T("Timeout")+" ("+T("Second")+")", func() {
 			myui.TextInput(c.Key("timeout"), &st.TimeoutText)
 		})
-		myui.Text(c, T("Privileges")+": "+st.PrivNote).FontSize(11).
-			TextColor(pickColor(t, st.PrivOK, t.TextMuted, t.Warning)).Wrap()
 	})
 }
 
@@ -228,8 +226,6 @@ func (st *State) actions(c *myui.Context) {
 				Disabled(st.Busy).OnClick(func() { st.Act.Do(st.Act.RefreshStatus) })
 			myui.Button(c.Key("logoff"), T("Log off the child session")).
 				Disabled(st.Busy || !st.Open).OnClick(func() { st.Act.Do(st.Act.LogOff) })
-			myui.Button(c.Key("priv"), T("Grant privileges")).
-				Disabled(st.Busy).OnClick(func() { st.Act.Do(st.Act.GrantPrivileges) })
 			myui.Button(c.Key("forget"), T("Forget password")).
 				Disabled(st.Busy).OnClick(func() { st.Act.Do(st.Act.ForgetPassword) })
 			myui.Button(c.Key("dir"), T("Open the data folder")).

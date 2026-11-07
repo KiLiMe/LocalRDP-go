@@ -177,13 +177,10 @@ func (a *actions) RefreshStatus() {
 	if code == 0 || code == 2 {
 		id = parseSessionID(out)
 	}
-	priv := hasPrivileges()
 	open := id != ""
 	a.Do(func() {
 		a.St.SessionID = id
 		a.St.Open = open
-		a.St.PrivOK = priv
-		a.St.PrivNote = privNote(priv)
 	})
 	a.appendLog(nonEmptyLines(out))
 }
@@ -205,28 +202,6 @@ func (a *actions) LogOff() {
 		}
 		a.setBusy(false, "")
 		a.Do(a.RefreshStatus)
-	}()
-}
-
-// GrantPrivileges runs the script that enables the privileges a child
-// session needs; Windows asks for permission.
-func (a *actions) GrantPrivileges() {
-	script := privScript()
-	if script == "" {
-		a.Do(func() { a.St.FormErr, a.St.FormErrOn = ui.T("The privileges script was not found."), "" })
-		return
-	}
-	a.Do(func() { a.St.Busy = true })
-	go func() {
-		code := runElevated(script)
-		a.Do(func() {
-			a.St.Busy = false
-			a.St.PrivOK = hasPrivileges()
-			a.St.PrivNote = privNote(a.St.PrivOK)
-		})
-		if code != 0 {
-			a.appendLog([]string{ui.T("The script did not finish.") + " (" + strconv.Itoa(code) + ")"})
-		}
 	}()
 }
 

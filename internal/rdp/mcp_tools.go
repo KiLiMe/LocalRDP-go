@@ -330,7 +330,7 @@ func mcpTools() []mcp.Tool {
 		{
 			Name:        "lrdp_start",
 			Title:       "Run a program in the child session",
-			Description: "Start `localrdp start -- <program>` detached. Needs the two privileges granted by install-privileges.ps1 and a logon re-login.",
+			Description: "Start `localrdp start -- <program>` detached. Needs SeTcbPrivilege and SeAssignPrimaryTokenPrivilege granted by hand (see 手动授予特权.md) and a logon re-login.",
 			Schema: mcp.ObjectSchema(map[string]any{
 				"program":      mcp.Prop("string", "program to run in the child session"),
 				"args":         mcp.Prop("string", "arguments for the program, one command line"),
@@ -348,7 +348,7 @@ func mcpTools() []mcp.Tool {
 			Title:       "Press a button",
 			Description: "Press a button of the window or of a session window without a mouse, as `localrdp click` does: fullscreen / reconnect / disconnect for the session window's bar, and the window's own buttons for the rest.",
 			Schema: mcp.ObjectSchema(map[string]any{
-				"button": mcp.Prop("string", "button name: fullscreen, reconnect, disconnect, open, status, stop, privilege, forget-password, data-folder, show, close-session, refresh, clear-log, copy-log"),
+				"button": mcp.Prop("string", "button name: fullscreen, reconnect, disconnect, open, status, stop, forget-password, data-folder, show, close-session, refresh, clear-log, copy-log"),
 				"pid":    mcp.Prop("integer", "session window process id (default: the one that is open)"),
 			}, []string{"button"}, false),
 			Run: func(args map[string]any) (string, error) {

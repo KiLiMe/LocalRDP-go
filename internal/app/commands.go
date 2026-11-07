@@ -58,8 +58,6 @@ func (a *App) press(name string) {
 			act.RefreshStatus()
 		case "stop":
 			act.LogOff()
-		case "privilege":
-			act.GrantPrivileges()
 		case "forget-password":
 			act.ForgetPassword()
 		case "data-folder":

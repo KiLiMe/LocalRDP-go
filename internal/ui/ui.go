@@ -21,12 +21,10 @@ func T(s string) string { return i18n.T(s) }
 type Actions interface {
 	// OpenSession opens the session of the form, as it is now.
 	OpenSession()
-	// RefreshStatus asks what is open and what is granted.
+	// RefreshStatus asks what is open.
 	RefreshStatus()
 	// LogOff ends the child session the window is showing.
 	LogOff()
-	// GrantPrivileges runs the privileged script, which asks for UAC.
-	GrantPrivileges()
 	// ForgetPassword drops the cached password.
 	ForgetPassword()
 	// OpenDataFolder shows %LOCALAPPDATA%\LocalRDP.
@@ -79,10 +77,6 @@ type State struct {
 	// names it, empty when none does.
 	Open      bool
 	SessionID string
-	// PrivOK is whether this process holds the two privileges start needs,
-	// PrivNote what to say about it.
-	PrivOK   bool
-	PrivNote string
 
 	// Log is the tail of the child processes' log, and LogBusy whether it
 	// is being read.

@@ -257,7 +257,6 @@ var GuiCommands = []string{
 	"open",            // 打开子会话
 	"status",          // 状态
 	"stop",            // 注销子会话
-	"privilege",       // 授予特权
 	"forget-password", // 清理密码
 	"data-folder",     // 打开数据目录
 	"reconnect",       // 会话页的重连

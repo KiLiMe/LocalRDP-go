@@ -71,12 +71,8 @@ localrdp click open           # 主窗口：打开子会话
 | 文件剪贴板桥 | ⚠️ 同上 |
 | `--scale N` | ✅ 桌面按 N% 渲染（见 Q5） |
 
-需要特权时：
-
-```pwsh
-pwsh .\install-privileges.ps1     # 管理员，自动提权
-# 然后注销重登一次，特权才进入令牌
-```
+需要特权时（`start` 模式）：按 **[手动授予特权.md](手动授予特权.md)** 手动授予两项账户权限，
+然后注销重登一次，特权才进入令牌。程序里已不再提供按钮或授权脚本。
 
 ## 目录
 
@@ -116,7 +112,7 @@ app/    窗口逻辑：动作、子进程管理、状态刷新、日志跟随
 mcp/    MCP 协议层（工具表由 internal/rdp/mcp.go 注册）
 ```
 
-脚本：`localrdp.cmd` / `localrdp-ui.ps1` / `install-privileges.ps1` / `build.ps1`
+脚本：`localrdp.cmd` / `localrdp-ui.ps1` / `build.ps1`；特权手动授予见 `手动授予特权.md`
 
 资源：`rsrc_windows_amd64.syso`（exe 的图标与版本信息，`go build` 自动链入）；
 `winres/localrdp.ico` 由 `tools/genicon/main.go` 画出来（`go run tools/genicon/main.go`）。

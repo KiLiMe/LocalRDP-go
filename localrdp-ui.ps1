@@ -4,12 +4,12 @@
     .\localrdp.cmd                  -> 菜单
     pwsh .\localrdp-ui.ps1 desktop  -> 直接开子桌面
     pwsh .\localrdp-ui.ps1 start pwsh -> 在子会话里跑 pwsh
-    pwsh .\localrdp-ui.ps1 status|stop|setup|build
+    pwsh .\localrdp-ui.ps1 status|stop|build
   密码用 DPAPI(当前用户) 加密缓存到 %LOCALAPPDATA%\LocalRDP\cred.dat，可用 -Forget 清除。
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('menu', 'desktop', 'start', 'status', 'stop', 'setup', 'build')]
+    [ValidateSet('menu', 'desktop', 'start', 'status', 'stop', 'build')]
     [string]$Action = 'menu',
     [string]$Program = '',
     [switch]$Fullscreen,
@@ -85,12 +85,6 @@ function Get-Password {
     return $plain
 }
 
-# ---------- 特权检查 ----------
-function Test-TcbPrivilege {
-    $p = whoami /priv 2>$null
-    return ($p -match 'SeTcbPrivilege' -and $p -match 'SeAssignPrimaryTokenPrivilege')
-}
-
 # ---------- 组装参数 ----------
 function Invoke-LocalRdp([string[]]$LrdpArgs) {
     Say ("  > localrdp " + ($LrdpArgs -join ' ')) 'DarkGray'
@@ -134,10 +128,6 @@ function Start-ChildProgram([string]$cmdline) {
     if ([string]::IsNullOrWhiteSpace($cmdline)) { throw '需要指定要运行的程序。' }
     if (-not (Ensure-Exe)) { throw '编译失败。' }
     Ensure-NoChildSession
-    if (-not (Test-TcbPrivilege)) {
-        Say '  警告：当前登录令牌没有 SeTcbPrivilege / SeAssignPrimaryTokenPrivilege，' 'Yellow'
-        Say '        很可能无法把程序放进子会话（详见 使用说明.md 的"重新登录"一节）。' 'Yellow'
-    }
     $pw = Get-Password
     $env:LRDP_PW = $pw
     $progArgs = @( $cmdline -split ' ' | Where-Object { $_ -ne '' } )
@@ -160,9 +150,7 @@ function Show-Menu {
     while ($true) {
         Title "LocalRDP 一键启动器    ($User)"
         $hasCred = Test-Path -LiteralPath $CredFile
-        Say ("  密码缓存：{0}    特权：{1}" -f `
-                $(if ($hasCred) { '已保存' } else { '未保存' }), `
-                $(if (Test-TcbPrivilege) { '已就绪' } else { '需重新登录' })) 'DarkGray'
+        Say ("  密码缓存：{0}" -f $(if ($hasCred) { '已保存' } else { '未保存' })) 'DarkGray'
         Write-Host ''
         Write-Host '  1) 打开子桌面（带 Explorer 的完整第二桌面）'
         Write-Host '  2) 在子会话里运行程序'
@@ -170,8 +158,7 @@ function Show-Menu {
         $cid = Get-ChildSessionId
         Write-Host ('  4) 停止子会话' + $(if ($cid -ne '(none)') { "（注销会话 $cid）" } else { '（当前无）' }))
         Write-Host '  5) 清除缓存密码'
-        Write-Host '  6) 授予特权 / 修复安装（管理员）'
-        Write-Host '  7) 查看日志'
+        Write-Host '  6) 查看日志'
         Write-Host '  0) 退出'
         $c = Read-Host '  选择'
         switch ($c) {
@@ -184,10 +171,6 @@ function Show-Menu {
             '4' { Stop-Session | Out-Null }
             '5' { Reset-Password }
             '6' {
-                $s = Join-Path $Root 'install-privileges.ps1'
-                Start-Process pwsh -Verb RunAs -ArgumentList @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$s`"") -Wait
-            }
-            '7' {
                 if (Test-Path -LiteralPath $LogFile) { Get-Content -LiteralPath $LogFile -Tail 40 | Out-Host }
                 else { Say '  还没有日志。' 'Yellow' }
             }
@@ -214,8 +197,4 @@ switch ($Action) {
     'status'   { exit (Show-Status) }
     'stop'     { exit (Stop-Session) }
     'build'    { if (Ensure-Exe) { Say "  OK: $Exe" 'Green' } else { Say '  失败' 'Red' } }
-    'setup'    {
-        $s = Join-Path $Root 'install-privileges.ps1'
-        Start-Process pwsh -Verb RunAs -ArgumentList @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$s`"") -Wait
-    }
 }
