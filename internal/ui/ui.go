@@ -78,9 +78,10 @@ type State struct {
 	Open      bool
 	SessionID string
 
-	// Log is the tail of the child processes' log, and LogBusy whether it
-	// is being read.
-	Log string
+	// Log is the tail of the child processes' log, and LogOpen whether the
+	// console shows it: it is a card of its own, folded until asked for.
+	Log     string
+	LogOpen bool
 
 	// Settings is what the app remembers about itself, and SettingsOpen
 	// whether its dialog shows. Dark is the theme, LangLabel the language
@@ -101,6 +102,14 @@ type State struct {
 	WidthText   string
 	HeightText  string
 	TimeoutText string
+	// CustomRes is whether the size is the user's own, so the width and
+	// height may be typed in; a preset locks them.
+	CustomRes bool
+	// ToastMsg is what the window says it just did, shown once by the next
+	// frame; ToastSeq counts the things said, toastSeen the last one drawn.
+	ToastMsg  string
+	ToastSeq  int
+	toastSeen int
 	// SizeIndex is the window-size segment chosen, and sizeModeSeen the
 	// Form.SizeMode it was taken from, so a loaded session moves the
 	// segment and a click moves the form.
@@ -131,6 +140,15 @@ type Tab struct {
 
 // Label is the tab's name.
 func (t Tab) Label() string { return t.Session.Label() }
+
+// Notify puts a toast up with the next frame, saying what was just done.
+func (st *State) Notify(msg string) {
+	if msg == "" {
+		return
+	}
+	st.ToastMsg = msg
+	st.ToastSeq++
+}
 
 // View builds a frame of the window.
 func View(c *myui.Context, st *State) { st.view(c) }

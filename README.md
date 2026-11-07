@@ -26,7 +26,7 @@ go build -trimpath -ldflags '-s -w -H=windowsgui' -o build\bin\Release\localrdp.
 
 `localrdp-ui.ps1` 在找不到 exe 时调用 `build.ps1` 编译（等价于上面的 `go build`）。
 
-图形界面里「会话 → 启动程序」填要跑的命令行（如 `notepad.exe`），连上后它就在子会话里
+图形界面里「会话设置 → 启动程序」填要跑的命令行（如 `notepad.exe`），连上后它就在子会话里
 启动，程序退出了桌面还在；留空则只开桌面。
 
 ## AI 排查（MCP）

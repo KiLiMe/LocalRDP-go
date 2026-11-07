@@ -7,6 +7,7 @@ import (
 
 // view builds a frame of the window.
 func (st *State) view(c *myui.Context) {
+	c.SetTheme(theme())
 	st.formNumbers()
 	st.Dark = c.Theme().Dark
 	st.WindowW, st.WindowH = c.Size()
@@ -20,7 +21,6 @@ func (st *State) view(c *myui.Context) {
 			} else {
 				st.console(c)
 			}
-			st.panel(c)
 		})
 	})
 	if st.SettingsOpen {
@@ -28,6 +28,12 @@ func (st *State) view(c *myui.Context) {
 	}
 	if st.CloseOpen {
 		st.closeDialog(c)
+	}
+	// What was just done is said once, on the frame after it was done, so
+	// the toast is raised with the picture the state now makes.
+	if st.ToastSeq != st.toastSeen {
+		st.toastSeen = st.ToastSeq
+		c.Toast(st.ToastMsg)
 	}
 }
 

@@ -124,6 +124,7 @@ func (a *actions) open(s store.Session, password string) {
 		}
 		a.St.Open = true
 		a.St.Status = ui.T("Running")
+		a.St.Notify(ui.T("Running") + " · " + s.Label())
 	})
 	time.Sleep(1200 * time.Millisecond)
 	a.Do(a.RefreshStatus)
@@ -201,6 +202,7 @@ func (a *actions) LogOff() {
 			a.appendLog([]string{ui.T("Logging off failed.") + " (" + strconv.Itoa(code) + ")"})
 		}
 		a.setBusy(false, "")
+		a.Do(func() { a.St.Notify(ui.T("Done")) })
 		a.Do(a.RefreshStatus)
 	}()
 }
@@ -211,6 +213,7 @@ func (a *actions) ForgetPassword() {
 	a.Do(func() {
 		a.St.Password = ""
 		a.St.Status = ui.T("Password forgotten")
+		a.St.Notify(ui.T("Password forgotten"))
 	})
 }
 
@@ -218,6 +221,7 @@ func (a *actions) ForgetPassword() {
 func (a *actions) OpenDataFolder() {
 	_ = os.MkdirAll(store.Dir(), 0o755)
 	_ = exec.Command("explorer.exe", store.Dir()).Start()
+	a.Do(func() { a.St.Notify(ui.T("Open the data folder") + " · " + store.Dir()) })
 }
 
 // ShowSession brings a session's child window to the front.
@@ -285,7 +289,10 @@ func (a *actions) CopyLog() {
 		a.appendLog([]string{err.Error()})
 		return
 	}
-	a.Do(func() { a.St.Status = ui.T("Log copied") })
+	a.Do(func() {
+		a.St.Status = ui.T("Log copied")
+		a.St.Notify(ui.T("Log copied"))
+	})
 }
 
 // SetLang switches the words and keeps the choice.
@@ -311,7 +318,10 @@ func (a *actions) SaveSettings() {
 	a.St.Settings = s
 	a.Do(func() { a.St.Settings = s })
 	_ = store.SaveSettings(s)
-	a.Do(func() { a.St.Status = ui.T("Saved") })
+	a.Do(func() {
+		a.St.Status = ui.T("Saved")
+		a.St.Notify(ui.T("Saved"))
+	})
 }
 
 // shutdown ends what the window opened, as it closes.
