@@ -790,6 +790,8 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	s.resizable = style&win.WS_THICKFRAME != 0
 
 	inst := win.GetModuleHandle(nil)
+	appIcon := loadAppIcon(inst, win.GetSystemMetrics(win.SM_CXICON))
+	appIconSm := loadAppIcon(inst, win.GetSystemMetrics(win.SM_CXSMICON))
 	wc := win.WNDCLASSEX{
 		CbSize:        uint32(unsafe.Sizeof(win.WNDCLASSEX{})),
 		Style:         win.CS_HREDRAW | win.CS_VREDRAW,
@@ -797,6 +799,8 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 		HInstance:     inst,
 		HCursor:       win.LoadCursor(0, win.MAKEINTRESOURCE(uintptr(win.IDC_ARROW))),
 		HbrBackground: win.HBRUSH(win.GetStockObject(win.BLACK_BRUSH)),
+		HIcon:         appIcon,
+		HIconSm:       appIconSm,
 		LpszClassName: win32.UTF16Ptr(className),
 	}
 	if win.RegisterClassEx(&wc) == 0 {
@@ -809,6 +813,9 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 		printErr("CreateWindowEx failed: " + formatWin32(uint32(win.GetLastError())))
 		return int(ExitError)
 	}
+	// 窗口自己再挂一次图标：只写在窗口类里时，任务栏缩略图和 Alt+Tab 有时会画成空壳。
+	win.SendMessage(s.hwnd, win.WM_SETICON, iconBig, uintptr(appIcon))
+	win.SendMessage(s.hwnd, win.WM_SETICON, iconSmall, uintptr(appIconSm))
 	if opt.Fullscreen {
 		// 走同一条路，才能记住原样式/位置，Ctrl+Alt+F 才退得回来。
 		s.enterFullscreen()

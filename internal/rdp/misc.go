@@ -5,6 +5,8 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/lxn/win"
 )
 
 var (
@@ -63,6 +65,22 @@ func removeClipboardFormatListener(hwnd uintptr) {
 
 func enumWindows(cb uintptr, lparam uintptr) {
 	procEnumWindows.Call(cb, lparam)
+}
+
+// exe 里的图标资源：go-winres 生成的 rsrc_windows_amd64.syso，图标组号是 1。
+// 没有它，任务栏缩略图、Alt+Tab 只能画一个通用的空壳图标。
+const (
+	appIconID = 1
+	iconSmall = 0
+	iconBig   = 1
+)
+
+// loadAppIcon 按需要的边长从 exe 的图标资源里取一张，取不到返回 0（窗口照旧没有图标）。
+func loadAppIcon(inst win.HINSTANCE, size int32) win.HICON {
+	if size <= 0 {
+		size = 32
+	}
+	return win.HICON(win.LoadImage(inst, win.MAKEINTRESOURCE(appIconID), win.IMAGE_ICON, size, size, win.LR_DEFAULTCOLOR))
 }
 
 func windowText(hwnd uintptr) string {
