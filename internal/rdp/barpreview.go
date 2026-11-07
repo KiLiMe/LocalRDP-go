@@ -39,7 +39,7 @@ func PreviewBar(path string, width int32, rows []barModel) error {
 			return os.ErrInvalid
 		}
 		old := win.SelectObject(mem, win.HGDIOBJ(bm))
-		m.paint(mem, width)
+		m.paint(mem, width, height)
 		win.GdiFlush()
 
 		src := unsafe.Slice((*byte)(bits), int(width)*int(height)*4)

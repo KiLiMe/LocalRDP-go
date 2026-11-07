@@ -14,7 +14,10 @@ import (
 // it says what the session is doing, on the right it offers the three things
 // worth doing with it: full screen, reconnect, disconnect.
 const (
-	kBarH      = 40
+	kBarH = 40
+	// kGrip is the strip of window around the picture that resizes it: the
+	// window has no frame of its own, so the ring has to be ours.
+	kGrip      = 4
 	barPad     = 12
 	barGap     = 10
 	barPillH   = 22
@@ -24,6 +27,9 @@ const (
 	barBtnPad  = 10
 	barBtnIcon = 12
 	barIconGap = 5
+	// barCapW is the width of one of the three caption buttons at the right
+	// edge, as wide as Windows draws them.
+	barCapW = 46
 
 	// wmRdpCommand asks the host window to act, from the interface or from
 	// another process (see win32.PostCommand).
@@ -31,6 +37,13 @@ const (
 	cmdReconnect  = win32.CmdReconnect
 	cmdDisconnect = win32.CmdDisconnect
 	cmdFullScreen = win32.CmdFullScreen
+
+	// The caption buttons are drawn here but run by Windows: the window
+	// reports them as non-client, and DefWindowProc turns a click into
+	// SC_MINIMIZE / SC_MAXIMIZE / SC_CLOSE.
+	cmdMinimize = 100
+	cmdMaximize = 101
+	cmdClose    = 102
 )
 
 // Glyphs of Segoe MDL2 Assets, the icons Windows itself uses.
@@ -40,6 +53,10 @@ const (
 	glyphPower      = 0xE7E8
 	glyphPerson     = 0xE77B
 	glyphFolder     = 0xE8F4 // NewFolder: the mark the window wears
+	glyphMinimize   = 0xE921
+	glyphMaximize   = 0xE922
+	glyphRestore    = 0xE923
+	glyphClose      = 0xE8BB
 )
 
 // The bar keeps to the dark frame of the window, so the picture stays the
@@ -66,6 +83,8 @@ var (
 	barRedBg   = barColor(45, 24, 26)
 	barRedBd   = barColor(74, 35, 41)
 	barRedHi   = barColor(58, 30, 32)
+	barCapHi   = barColor(38, 44, 56)
+	barCapRed  = barColor(196, 43, 28)
 )
 
 var (
@@ -194,6 +213,7 @@ type barButton struct {
 type barModel struct {
 	loggedIn      bool
 	everConnected bool
+	zoomed        bool
 	sid           uint32
 	hover         uintptr
 }
@@ -203,6 +223,7 @@ func (s *hostState) barModel() barModel {
 	return barModel{
 		loggedIn:      s.loggedIn,
 		everConnected: s.everConnected,
+		zoomed:        s.hwnd != 0 && win.IsZoomed(s.hwnd),
 		sid:           kNoSession,
 		hover:         s.barHoverCmd,
 	}
@@ -270,13 +291,36 @@ func pill(hdc win.HDC, x, mid int32, label string, dot, fg, bg, bd uint32, glyph
 	return rc.Right
 }
 
-// paint draws the whole bar and gives back the buttons, for hit testing.
-func (m barModel) paint(hdc win.HDC, width int32) []barButton {
-	height := int32(kBarH)
-	fillSolid(hdc, win.RECT{Right: width, Bottom: height}, barBg)
-	fillSolid(hdc, win.RECT{Top: height - 1, Right: width, Bottom: height}, barLine)
+// captionButtons lays the three window buttons out at the right edge, on the
+// same line as the bar: they are non-client, so Windows runs them.
+func captionButtons(hover uintptr, zoomed bool, width int32) []barButton {
+	maxGlyph := uint32(glyphMaximize)
+	if zoomed {
+		maxGlyph = glyphRestore
+	}
+	defs := []barButton{
+		{cmd: cmdClose, glyph: glyphClose, fg: barTxHi, hi: barCapRed},
+		{cmd: cmdMaximize, glyph: maxGlyph, fg: barTxHi, hi: barCapHi},
+		{cmd: cmdMinimize, glyph: glyphMinimize, fg: barTxHi, hi: barCapHi},
+	}
+	x := width
+	out := make([]barButton, 0, len(defs))
+	for _, d := range defs {
+		x -= barCapW
+		d.rect = win.RECT{Left: x, Top: 0, Right: x + barCapW, Bottom: kBarH}
+		out = append(out, d)
+	}
+	return out
+}
 
-	mid := height / 2
+// paint draws the whole bar and gives back the action buttons, for hit
+// testing. The area below the bar is painted too: the window has no frame,
+// and the ring the mouse resizes it with is this color.
+func (m barModel) paint(hdc win.HDC, width, height int32) []barButton {
+	fillSolid(hdc, win.RECT{Right: width, Bottom: height}, barBg)
+	fillSolid(hdc, win.RECT{Top: kBarH - 1, Right: width, Bottom: kBarH}, barLine)
+
+	mid := int32(kBarH / 2)
 	x := int32(barPad)
 
 	// The mark: the accent square with the folder the window wears.
@@ -286,7 +330,7 @@ func (m barModel) paint(hdc win.HDC, width int32) []barButton {
 
 	// The name.
 	nameW := barWidth(hdc, "LocalRDP", barFont(13, win.FW_SEMIBOLD))
-	barText(hdc, "LocalRDP", &win.RECT{Left: x, Top: 0, Right: x + nameW + 4, Bottom: height - 1},
+	barText(hdc, "LocalRDP", &win.RECT{Left: x, Top: 0, Right: x + nameW + 4, Bottom: kBarH},
 		barTxHi, barFont(13, win.FW_SEMIBOLD), win.DT_LEFT|win.DT_VCENTER|win.DT_SINGLELINE)
 	x += nameW + barGap
 
@@ -301,7 +345,7 @@ func (m barModel) paint(hdc win.HDC, width int32) []barButton {
 			0, barTxLo, barChip, barChipBd, glyphPerson)
 	}
 
-	btns := m.buttons(hdc, width)
+	btns := m.buttons(hdc, width-3*barCapW-barGap)
 	for _, b := range btns {
 		bg := b.bg
 		if b.cmd == m.hover {
@@ -315,6 +359,20 @@ func (m barModel) paint(hdc win.HDC, width int32) []barButton {
 			Right: b.rect.Right - barBtnPad + 2, Bottom: b.rect.Bottom},
 			b.fg, barFont(12, win.FW_NORMAL), win.DT_LEFT|win.DT_VCENTER|win.DT_SINGLELINE)
 	}
+
+	// A hairline, then the three buttons Windows would have drawn itself.
+	sepX := width - 3*barCapW - 1
+	fillSolid(hdc, win.RECT{Left: sepX, Top: mid - 8, Right: sepX + 1, Bottom: mid + 8}, barLine)
+	for _, b := range captionButtons(m.hover, m.zoomed, width) {
+		fg := b.fg
+		if b.cmd == m.hover {
+			fillSolid(hdc, b.rect, b.hi)
+			if b.cmd == cmdClose {
+				fg = barWhite
+			}
+		}
+		barGlyph(hdc, b.glyph, b.rect, fg, 10)
+	}
 	return btns
 }
 
@@ -324,24 +382,36 @@ func (s *hostState) drawBar(hdc win.HDC) {
 	if s.barHeight() == 0 {
 		return
 	}
-	width, _ := clientDesktopSize(s.hwnd)
+	width, height := clientDesktopSize(s.hwnd)
 	m := s.barModel()
 	if m.loggedIn {
 		m.sid = getChildSessionID()
 	}
-	m.paint(hdc, width)
+	m.paint(hdc, width, height)
 }
 
-// barHit is the command of the button at x, y, or 0 for the bar itself.
+// barHit is the command of the action button at x, y, or 0 for the bar itself.
 func (s *hostState) barHit(x, y int32) uintptr {
 	width, _ := clientDesktopSize(s.hwnd)
 	hdc := win.GetDC(s.hwnd)
 	if hdc == 0 {
 		return 0
 	}
-	btns := s.barModel().buttons(hdc, width)
+	btns := s.barModel().buttons(hdc, width-3*barCapW-barGap)
 	win.ReleaseDC(s.hwnd, hdc)
 	for _, b := range btns {
+		if x >= b.rect.Left && x < b.rect.Right && y >= b.rect.Top && y < b.rect.Bottom {
+			return b.cmd
+		}
+	}
+	return 0
+}
+
+// captionHit is the caption button at x, y, or 0 for the rest of the bar.
+func (s *hostState) captionHit(x, y int32) uintptr {
+	width, _ := clientDesktopSize(s.hwnd)
+	zoomed := s.hwnd != 0 && win.IsZoomed(s.hwnd)
+	for _, b := range captionButtons(0, zoomed, width) {
 		if x >= b.rect.Left && x < b.rect.Right && y >= b.rect.Top && y < b.rect.Bottom {
 			return b.cmd
 		}
@@ -357,13 +427,86 @@ func (s *hostState) barHover(x, y int32) {
 	}
 	cmd := uintptr(0)
 	if y >= 0 && y < kBarH {
-		cmd = s.barHit(x, y)
+		cmd = s.captionHit(x, y)
+		if cmd == 0 {
+			cmd = s.barHit(x, y)
+		}
 	}
 	if cmd == s.barHoverCmd {
 		return
 	}
 	s.barHoverCmd = cmd
 	s.invalidateBar()
+}
+
+// barHoverAtPointer repeats the highlight after a leave message, which comes
+// with no coordinates of its own.
+func (s *hostState) barHoverAtPointer() {
+	var pt win.POINT
+	if !win.GetCursorPos(&pt) || !win.ScreenToClient(s.hwnd, &pt) {
+		return
+	}
+	s.barHover(pt.X, pt.Y)
+}
+
+// windowHit is what the window has at x, y of its client area: the edges
+// resize it, the bar drags it, the buttons act.
+func (s *hostState) windowHit(x, y int32) uintptr {
+	w, h := clientDesktopSize(s.hwnd)
+	if grip := s.grip(); grip > 0 && !win.IsZoomed(s.hwnd) {
+		if code := gripHit(x, y, w, h, grip); code != 0 {
+			return code
+		}
+	}
+	if y < s.barHeight() {
+		switch s.captionHit(x, y) {
+		case cmdMinimize:
+			return win.HTMINBUTTON
+		case cmdMaximize:
+			return win.HTMAXBUTTON
+		case cmdClose:
+			return win.HTCLOSE
+		}
+		if s.barHit(x, y) != 0 {
+			return win.HTCLIENT
+		}
+		// The rest of the bar drags the window, double-clicks to maximize,
+		// and opens the system menu on a right click: all of that is what
+		// HTCAPTION means to Windows.
+		return win.HTCAPTION
+	}
+	return win.HTCLIENT
+}
+
+// gripHit is the resize code for a point in the ring around the picture, or
+// 0 when the point is not on it.
+func gripHit(x, y, w, h, grip int32) uintptr {
+	side := uintptr(0)
+	switch {
+	case x < grip:
+		side = win.HTLEFT
+	case x >= w-grip:
+		side = win.HTRIGHT
+	}
+	switch {
+	case y < grip:
+		switch side {
+		case win.HTLEFT:
+			return win.HTTOPLEFT
+		case win.HTRIGHT:
+			return win.HTTOPRIGHT
+		}
+		return win.HTTOP
+	case y >= h-grip:
+		switch side {
+		case win.HTLEFT:
+			return win.HTBOTTOMLEFT
+		case win.HTRIGHT:
+			return win.HTBOTTOMRIGHT
+		}
+		return win.HTBOTTOM
+	}
+	return side
 }
 
 // barClick handles a click at x, y: it says whether the bar took it.

@@ -58,16 +58,6 @@ func subAuthorityEnd(sid uintptr) int {
 	return 8 + n*4
 }
 
-func adjustWindowRectEx(r *win_Rect, style uint32, menu bool, ex uint32) bool {
-	m := 0
-	if menu {
-		m = 1
-	}
-	ok, _, _ := procAdjustWindowRectEx.Call(uintptr(unsafe.Pointer(r)), uintptr(style),
-		uintptr(m), uintptr(ex))
-	return ok != 0
-}
-
 func removeClipboardFormatListener(hwnd uintptr) {
 	procRemoveClipboardListener.Call(hwnd)
 }
@@ -85,6 +75,3 @@ func windowText(hwnd uintptr) string {
 	procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
 	return syscall.UTF16ToString(buf)
 }
-
-// win_Rect aliases lxn/win RECT so helpers above stay readable.
-type win_Rect = rect

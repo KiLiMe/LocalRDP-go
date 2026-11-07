@@ -73,6 +73,11 @@ type hostState struct {
 	clipStarted bool
 	discDone    bool
 	discSeen    bool
+	// resizable is whether the window got WS_THICKFRAME: fixed size windows
+	// have no grip to drag.
+	resizable bool
+	// hoverTracked is whether a leave message is on its way for the bar.
+	hoverTracked bool
 	// barHoverCmd is the bar button under the pointer, 0 for none: the bar
 	// paints it highlighted.
 	barHoverCmd uintptr
@@ -98,17 +103,28 @@ func (s *hostState) resizeAx() {
 	s.placeView(w, h)
 }
 
-// placeView puts the control's window under the bar and says the same thing
-// to the control itself.
+// placeView puts the control's window under the bar, inside the ring the
+// window resizes with, and says the same thing to the control itself.
 func (s *hostState) placeView(w, h int32) {
 	bar := s.barHeight()
-	h = maxI32(h-bar, 1)
+	grip := s.grip()
+	vw := maxI32(w-2*grip, 1)
+	vh := maxI32(h-bar-grip, 1)
 	if s.view != 0 {
-		win.SetWindowPos(s.view, 0, 0, bar, w, h, win.SWP_NOZORDER|win.SWP_NOACTIVATE)
+		win.SetWindowPos(s.view, 0, grip, bar, vw, vh, win.SWP_NOZORDER|win.SWP_NOACTIVATE)
 	}
 	if s.host != nil {
-		s.host.setRect(0, 0, w, h)
+		s.host.setRect(0, 0, vw, vh)
 	}
+}
+
+// grip is the width of the strip around the picture that resizes the window:
+// the window draws no frame, so the strip has to be inside it.
+func (s *hostState) grip() int32 {
+	if !s.resizable || s.fullscreen || s.sizeMode == store.SizeFixed {
+		return 0
+	}
+	return kGrip
 }
 
 func maxI32(a, b int32) int32 {
@@ -404,11 +420,70 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		return win.DefWindowProc(hwnd, msg, wParam, lParam)
 	}
 	switch msg {
+	case win.WM_NCCALCSIZE:
+		// 无边框窗口：客户区就是整个窗口，本进程在里面自己画标题栏。
+		if wParam == 0 {
+			break
+		}
+		if p := ptrAt[nccalcParams](lParam); p != nil && !s.fullscreen && win.IsZoomed(hwnd) {
+			// 最大化时系统给的位置比工作区大出一圈边框，要收回来，
+			// 否则客户区会有半边在屏幕外。
+			b := int32(win.GetSystemMetrics(win.SM_CXSIZEFRAME)) + int32(win.GetSystemMetrics(smCXPaddedBorder))
+			p.Rgv[0].Left += b
+			p.Rgv[0].Top += b
+			p.Rgv[0].Right -= b
+			p.Rgv[0].Bottom -= b
+		}
+		return 0
+	case win.WM_NCHITTEST:
+		if s.fullscreen || s.barHeight() == 0 {
+			break
+		}
+		if pt := screenPoint(lParam); win.ScreenToClient(hwnd, &pt) {
+			return s.windowHit(pt.X, pt.Y)
+		}
+	case win.WM_NCLBUTTONDOWN:
+		// 没有真正的标题栏，DefWindowProc 不会替我们按这几个按钮。
+		switch wParam {
+		case win.HTMINBUTTON:
+			win.ShowWindow(hwnd, win.SW_MINIMIZE)
+			return 0
+		case win.HTMAXBUTTON:
+			if win.IsZoomed(hwnd) {
+				win.ShowWindow(hwnd, win.SW_RESTORE)
+			} else {
+				win.ShowWindow(hwnd, win.SW_MAXIMIZE)
+			}
+			return 0
+		case win.HTCLOSE:
+			s.requestClose()
+			return 0
+		}
+	case win.WM_NCMOUSEMOVE:
+		// 顶栏成了非客户区（HTCAPTION），悬停高亮要从这条消息里跟。
+		if pt := screenPoint(lParam); win.ScreenToClient(hwnd, &pt) {
+			s.barHover(pt.X, pt.Y)
+		}
+		if !s.hoverTracked {
+			s.hoverTracked = true
+			var tme win.TRACKMOUSEEVENT
+			tme.CbSize = uint32(unsafe.Sizeof(tme))
+			tme.DwFlags = win.TME_LEAVE | win.TME_NONCLIENT
+			tme.HwndTrack = hwnd
+			win.TrackMouseEvent(&tme)
+		}
+		return win.DefWindowProc(hwnd, msg, wParam, lParam)
+	case win.WM_NCMOUSELEAVE, win.WM_MOUSELEAVE:
+		s.hoverTracked = false
+		s.barHoverAtPointer()
+		return 0
 	case win.WM_SIZE:
 		if win.IsIconic(hwnd) {
 			// 最小化时客户区是 0，别拿它去改会话分辨率。
 			return 0
 		}
+		// 最大化/还原会换掉最右那个按钮的字形。
+		s.invalidateBar()
 		s.resizeAx()
 		if s.sizeMode == store.SizeFixed {
 			// 固定大小：窗口动不了，画面也不用重设。
@@ -582,6 +657,26 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 
 var wndProcCb = syscall.NewCallback(wndProc)
 
+// smCXPaddedBorder is SM_CXPADDEDBORDER, which lxn/win does not name: the
+// extra ring Windows adds around a resizable frame.
+const smCXPaddedBorder = 92
+
+// nccalcParams is NCCALCSIZE_PARAMS: the rectangles Windows proposes for the
+// client area, the window itself, and the client area before the change.
+type nccalcParams struct {
+	Rgv    [3]win.RECT
+	LpPos  unsafe.Pointer
+	LpRect unsafe.Pointer
+}
+
+// screenPoint unpacks the pointer position mouse messages carry in lParam.
+func screenPoint(lParam uintptr) win.POINT {
+	return win.POINT{
+		X: int32(int16(lParam & 0xFFFF)),
+		Y: int32(int16((lParam >> 16) & 0xFFFF)),
+	}
+}
+
 // defaultWindowRect 按 C++ 的规则算客户区：工作区 5/6，宽取偶，居中。
 func defaultWindowRect(opt *StartOptions) (int32, int32, int32, int32) {
 	wa := primaryWorkArea()
@@ -673,10 +768,10 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 		style &^= win.WS_THICKFRAME | win.WS_MAXIMIZEBOX
 	}
 
+	// 无边框：窗口矩形就是客户区，不再往外加一圈看不见的边框。
 	rc := win.RECT{Left: x, Top: y, Right: x + cw, Bottom: y + ch}
-	adjustWindowRectEx((*win_Rect)(unsafe.Pointer(&rc)), style, false, exStyle)
-	s.fixedW = int32(rc.Right - rc.Left)
-	s.fixedH = int32(rc.Bottom - rc.Top)
+	s.fixedW, s.fixedH = cw, ch
+	s.resizable = style&win.WS_THICKFRAME != 0
 
 	inst := win.GetModuleHandle(nil)
 	wc := win.WNDCLASSEX{
@@ -701,6 +796,11 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	if opt.Fullscreen {
 		// 走同一条路，才能记住原样式/位置，Ctrl+Alt+F 才退得回来。
 		s.enterFullscreen()
+	} else {
+		// 建窗口时系统只问了不带 wParam 的那一次，客户区还是按有标题栏算的；
+		// 这一句让它按新的算法重算一次，标题栏才真的消失。
+		win.SetWindowPos(s.hwnd, 0, 0, 0, 0, 0,
+			win.SWP_FRAMECHANGED|win.SWP_NOMOVE|win.SWP_NOSIZE|win.SWP_NOZORDER|win.SWP_NOACTIVATE)
 	}
 	win.ShowWindow(s.hwnd, show)
 	if show != int32(win.SW_HIDE) && !win.IsWindowVisible(s.hwnd) {
@@ -723,11 +823,16 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	}
 
 	var created bool
-	// 控件住在一个子窗口里：上面的栏是本进程画的，控件只管栏下面那块。
+	// 控件住在一个子窗口里：上面的栏是本进程画的，控件只管栏下面那块，
+	// 四周再留一圈给鼠标拖拽改大小。
 	bar := barHeightFor(&opt)
+	grip := int32(kGrip)
+	if !s.resizable || s.sizeMode == store.SizeFixed {
+		grip = 0
+	}
 	s.view = win.CreateWindowEx(0, win32.UTF16Ptr("STATIC"), nil,
 		win.WS_CHILD|win.WS_VISIBLE|win.WS_CLIPCHILDREN|win.WS_CLIPSIBLINGS,
-		0, bar, cw, ch-bar, s.hwnd, 0, inst, nil)
+		grip, bar, cw-2*grip, ch-bar-grip, s.hwnd, 0, inst, nil)
 	if s.view == 0 {
 		logWarn("创建控件容器失败: " + formatWin32(uint32(win.GetLastError())))
 	}
