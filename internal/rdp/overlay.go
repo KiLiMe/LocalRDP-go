@@ -16,6 +16,12 @@ const (
 	overlayClass = "LocalRDP.Overlay"
 	// kOverlayTop is the gap between the top edge and the floating bar.
 	kOverlayTop = 10
+	// kOverlayReveal is how close to the top edge the pointer has to be for
+	// the bar to come out: it is a strip of the remote desktop otherwise.
+	kOverlayReveal = 4
+	// kOverlaySlack is how far below the bar the pointer may wander without
+	// the bar going away again, so it can be reached from the edge.
+	kOverlaySlack = 8
 	// maNoActivate is MA_NOACTIVATE, which lxn/win does not name.
 	maNoActivate = 3
 )
@@ -73,13 +79,15 @@ func (s *hostState) createOverlay(inst win.HINSTANCE) {
 	s.layoutOverlay()
 }
 
-// layoutOverlay puts the floating bar in the middle of the top edge while the
-// window is full screen, and keeps it out of the way the rest of the time.
+// layoutOverlay puts the floating bar in the middle of the top edge while
+// the window is full screen, and keeps it out of the way the rest of the time.
 func (s *hostState) layoutOverlay() {
 	if s.overlay == 0 {
 		return
 	}
-	if !s.fullscreen {
+	if !s.fullscreen || !s.overlayShown {
+		s.overlayShown = false
+		s.overlayHover = 0
 		win.ShowWindow(s.overlay, win.SW_HIDE)
 		return
 	}
@@ -91,6 +99,33 @@ func (s *hostState) layoutOverlay() {
 	}
 	win.SetWindowPos(s.overlay, win.HWND_TOP, x, kOverlayTop, w, h,
 		win.SWP_NOACTIVATE|win.SWP_SHOWWINDOW)
+}
+
+// trackOverlay watches the pointer on the timer full screen runs: touching
+// the top edge brings the bar out, and it goes away again once the pointer is
+// below it. Nothing else on the picture moves.
+func (s *hostState) trackOverlay() {
+	if s.overlay == 0 || !s.fullscreen {
+		return
+	}
+	var pt win.POINT
+	if !win.GetCursorPos(&pt) {
+		return
+	}
+	if !win.ScreenToClient(s.hwnd, &pt) {
+		return
+	}
+	_, h := overlaySize()
+	show := pt.Y >= 0 && pt.Y <= kOverlayReveal
+	if !show && s.overlayShown {
+		// The pointer is on its way down from the edge to the buttons.
+		show = pt.Y >= 0 && pt.Y <= kOverlayTop+h+kOverlaySlack
+	}
+	if show == s.overlayShown {
+		return
+	}
+	s.overlayShown = show
+	s.layoutOverlay()
 }
 
 // overlayModel is what the floating bar draws with: the same three buttons as

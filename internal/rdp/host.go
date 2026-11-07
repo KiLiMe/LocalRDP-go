@@ -21,6 +21,9 @@ const (
 	kTimerDisplay   = 5
 	kTimerClip      = 6
 	kTimerReconnect = 7
+	// kTimerOverlay watches the pointer in full screen: the floating bar
+	// only shows while it is at the top edge.
+	kTimerOverlay = 8
 
 	wmRdpDisconnected = win.WM_APP + 1
 	className         = "LocalRDP.Host"
@@ -51,6 +54,7 @@ type hostState struct {
 
 	overlayHover                     uintptr
 	overlayTracked                   bool
+	overlayShown                     bool
 	appliedW, appliedH, appliedScale int
 	// retrying is set while a reconnect is between Disconnect and Connect.
 	retrying   bool
@@ -265,6 +269,7 @@ func (s *hostState) enterFullscreen() {
 	win.PostMessage(s.hwnd, win.WM_SIZE, 0, 0)
 	win.InvalidateRect(s.hwnd, nil, true)
 	s.layoutOverlay()
+	win.SetTimer(s.hwnd, kTimerOverlay, 120, 0)
 	logInfo("Fullscreen entered（Ctrl+Alt+F 退出）")
 }
 
@@ -282,6 +287,7 @@ func (s *hostState) leaveFullscreen() {
 	win.PostMessage(s.hwnd, win.WM_SIZE, 0, 0)
 	win.InvalidateRect(s.hwnd, nil, true)
 	s.layoutOverlay()
+	win.KillTimer(s.hwnd, kTimerOverlay)
 	logInfo("Fullscreen left")
 }
 
@@ -601,6 +607,9 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 			// 不调用 DestroyWindow：控件在 WM_DESTROY 里会卡住。直接让消息循环退出。
 			win.PostQuitMessage(0)
 			return 0
+		case kTimerOverlay:
+			s.trackOverlay()
+			return 0
 		}
 		return 0
 	case win.WM_PAINT:
@@ -653,7 +662,7 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		win32.UnregisterHotKey(uintptr(hwnd), hotkeyFullScreen)
 		// 只发退出信号；COM 对象在消息循环结束后再释放，
 		// 避免在控件自己的回调栈里 Release 导致卡死。
-		for _, id := range []uintptr{kTimerWatchdog, kTimerLaunch, kTimerQuit, kTimerResize, kTimerDisplay, kTimerClip, kTimerReconnect} {
+		for _, id := range []uintptr{kTimerWatchdog, kTimerLaunch, kTimerQuit, kTimerResize, kTimerDisplay, kTimerClip, kTimerReconnect, kTimerOverlay} {
 			win.KillTimer(hwnd, id)
 		}
 		win.PostQuitMessage(0)
