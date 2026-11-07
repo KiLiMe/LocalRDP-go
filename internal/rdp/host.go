@@ -73,6 +73,9 @@ type hostState struct {
 	clipStarted bool
 	discDone    bool
 	discSeen    bool
+	// barHoverCmd is the bar button under the pointer, 0 for none: the bar
+	// paints it highlighted.
+	barHoverCmd uintptr
 }
 
 var gHost *hostState
@@ -526,6 +529,9 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 			win.EndPaint(hwnd, &ps)
 		}
 		return 0
+	case win.WM_MOUSEMOVE:
+		s.barHover(int32(int16(lParam&0xFFFF)), int32(int16((lParam>>16)&0xFFFF)))
+		return win.DefWindowProc(hwnd, msg, wParam, lParam)
 	case win.WM_LBUTTONDOWN:
 		bx := int32(int16(lParam & 0xFFFF))
 		by := int32(int16((lParam >> 16) & 0xFFFF))
