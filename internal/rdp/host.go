@@ -35,7 +35,9 @@ type hostState struct {
 	axHwnd win.HWND
 	// view is the child window the control lives in: the bar above it belongs
 	// to this process, so the control gets the rest of the window.
-	view    win.HWND
+	view win.HWND
+	// overlay is the bar's buttons floated over the picture in full screen.
+	overlay win.HWND
 	opt     StartOptions
 	jobPath string
 
@@ -47,6 +49,8 @@ type hostState struct {
 	discReason    int32
 	extReason     int32
 
+	overlayHover                     uintptr
+	overlayTracked                   bool
 	appliedW, appliedH, appliedScale int
 	// retrying is set while a reconnect is between Disconnect and Connect.
 	retrying   bool
@@ -260,6 +264,7 @@ func (s *hostState) enterFullscreen() {
 	s.resizeAx()
 	win.PostMessage(s.hwnd, win.WM_SIZE, 0, 0)
 	win.InvalidateRect(s.hwnd, nil, true)
+	s.layoutOverlay()
 	logInfo("Fullscreen entered（Ctrl+Alt+F 退出）")
 }
 
@@ -276,6 +281,7 @@ func (s *hostState) leaveFullscreen() {
 	s.resizeAx()
 	win.PostMessage(s.hwnd, win.WM_SIZE, 0, 0)
 	win.InvalidateRect(s.hwnd, nil, true)
+	s.layoutOverlay()
 	logInfo("Fullscreen left")
 }
 
@@ -484,6 +490,7 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		}
 		// 最大化/还原会换掉最右那个按钮的字形。
 		s.invalidateBar()
+		s.layoutOverlay()
 		s.resizeAx()
 		if s.sizeMode == store.SizeFixed {
 			// 固定大小：窗口动不了，画面也不用重设。
@@ -836,6 +843,7 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	if s.view == 0 {
 		logWarn("创建控件容器失败: " + formatWin32(uint32(win.GetLastError())))
 	}
+	s.createOverlay(inst)
 	for i := range clsidRdpClients {
 		if err := s.host.create(&clsidRdpClients[i], s.view); err != nil {
 			logWarn("创建 RDP 控件失败: " + err.Error())
