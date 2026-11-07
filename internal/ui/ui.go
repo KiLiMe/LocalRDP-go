@@ -73,6 +73,8 @@ type State struct {
 	Sessions []Tab
 	// Active is the tab in front, -1 for none: the console.
 	Active int
+	// SessionOpen shows the active session's card over the form.
+	SessionOpen bool
 	// Open is whether a child session runs, SessionID its id as status
 	// names it, empty when none does.
 	Open      bool

@@ -42,9 +42,9 @@ func (st *State) consoleHead(c *myui.Context) {
 		if st.Busy {
 			myui.Text(c, st.Status).FontSize(11).TextColor(t.TextMuted).SingleLine()
 		}
-		if len(st.Sessions) > 0 {
+		if st.hasSession() {
 			myui.Button(c, T("Back to the session")).Height(30).OnClick(func() {
-				st.Active = len(st.Sessions) - 1
+				st.SessionOpen = true
 			})
 		}
 		myui.PrimaryButton(c.Key("open"), T("Open child session")).Height(30).

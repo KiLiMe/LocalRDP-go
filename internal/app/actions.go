@@ -123,6 +123,7 @@ func (a *actions) open(s store.Session, password string) {
 			}
 		}
 		a.St.Open = true
+		a.St.SessionOpen = true
 		a.St.Status = ui.T("Running")
 		a.St.Notify(ui.T("Running") + " · " + s.Label())
 	})

@@ -16,13 +16,13 @@ func (st *State) view(c *myui.Context) {
 		main := myui.Row(c).Fill().AlignItems(myui.Stretch).Justify(myui.Start)
 		dumpMain(c, main)
 		main.Children(func() {
-			if st.Active >= 0 && st.Active < len(st.Sessions) {
-				st.sessionView(c)
-			} else {
-				st.console(c)
-			}
+			st.console(c)
 		})
 	})
+	// A session's card opens over the form, which stays as it was behind it.
+	if st.hasSession() && st.SessionOpen {
+		st.sessionDialog(c)
+	}
 	if st.SettingsOpen {
 		st.settingsDialog(c)
 	} else if st.settingsShown {
@@ -54,7 +54,7 @@ func (st *State) titleBar(c *myui.Context) {
 		myui.Text(c, "LocalRDP").FontSize(13).Bold().TextColor(t.Text).DragWindow()
 		myui.Box(c).Grow(1)
 		if st.hasSession() {
-			iconButton(c, iconPlus, T("New session"), false, func() { st.Active = -1 })
+			iconButton(c, iconDesktopOn, T("Session"), st.SessionOpen, func() { st.SessionOpen = true })
 		}
 		iconButton(c, iconSettings, T("Settings"), false, st.openSettings)
 	})
