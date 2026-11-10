@@ -73,25 +73,6 @@ localrdp click open           # 主窗口：打开子会话
 需要特权时（`start` 模式）：按 **[手动授予特权.md](docs/手动授予特权.md)** 手动授予两项账户权限，
 然后注销重登一次，特权才进入令牌。程序里不再提供授权按钮。
 
-## 目录
-
-完整代码地图（每个包做什么、启动链路、改动前必读的坑、阅读顺序）见
-**[docs/代码导读.md](docs/代码导读.md)**。这里只画到包级：
-
-```text
-main.go                  入口：os.Exit(rdp.Run(os.Args))
-internal/rdp/            命令行 + RDP 宿主（COM 容器、会话启动、顶栏、mcp）
-internal/app/  ui/       窗口逻辑 / 只读 State 的绘制
-internal/store/ i18n/    设置与 DPAPI 密码 / 中英文案
-internal/win32/ mcp/     Win32 小工具 / MCP 协议层
-build.ps1                构建：版本对账 + -X 注入
-rsrc_windows_amd64.syso  exe 的图标与版本信息（go build 自动链入）
-```
-
-`internal/` 是分层的：依赖方向 `app → ui → store → i18n`，`rdp` 不 import `app`/`ui`（
-唯一的例外是 `internal/rdp/gui_shim.go` 调 `app.Run` 开窗口）。GUI 按钮靠 `exec` 重新调用
-本 exe 的 `desktop`/`start`/`status`/`stop` 衔接，所以 `internal/app` 不 import `rdp`。
-
 ## 许可
 
 基于 [charles-cty/LocalRDP](https://github.com/charles-cty/LocalRDP)（MIT）重写，见 `LICENSE`。
