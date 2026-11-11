@@ -914,7 +914,7 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	s.resizable = style&win.WS_THICKFRAME != 0
 
 	inst := win.GetModuleHandle(nil)
-	appIcon, appIconSm := hostIcons(inst)
+	appIcon, appIconSm := hostIcons(inst, s.m.dpi)
 	wc := win.WNDCLASSEX{
 		CbSize:        uint32(unsafe.Sizeof(win.WNDCLASSEX{})),
 		Style:         win.CS_HREDRAW | win.CS_VREDRAW,

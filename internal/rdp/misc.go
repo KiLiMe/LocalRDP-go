@@ -55,9 +55,12 @@ func loadAppIcon(inst win.HINSTANCE, size int32) win.HICON {
 
 // hostIcons 返回会话窗口要挂的两个图标：大图标与小图标。会话版（右下角带点）
 // 取到就用它，取不到（PNG 解不开、DIB 建不成）退回 exe 资源里的那张。
-func hostIcons(inst win.HINSTANCE) (big, small win.HICON) {
-	bigSize := win.GetSystemMetrics(win.SM_CXICON)
-	smallSize := win.GetSystemMetrics(win.SM_CXSMICON)
+//
+// 边长按窗口所在屏的 dpi 放大：150% 时任务栏要 24、Alt+Tab 要 48，给 16/32 让系统
+// 自己拉大就糊了，而我们手上那源图是 256 的，缩得出来。
+func hostIcons(inst win.HINSTANCE, dpi uint32) (big, small win.HICON) {
+	bigSize := int32(dpiPx(int(win.GetSystemMetrics(win.SM_CXICON)), dpi))
+	smallSize := int32(dpiPx(int(win.GetSystemMetrics(win.SM_CXSMICON)), dpi))
 	big = sessionIcon(bigSize)
 	small = sessionIcon(smallSize)
 	if big == 0 {
