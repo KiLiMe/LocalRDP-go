@@ -185,6 +185,16 @@ func getEnvVar(name string) string {
 	return syscall.UTF16ToString(buf[:n])
 }
 
+// takeEnvVar reads a variable and then removes it. --password-env carries the
+// password in the environment so it stays off the command line, but the
+// processes this one starts (the session entry, the clipboard bridge, the
+// child fallback) inherit that environment, so it goes as soon as it is read.
+func takeEnvVar(name string) string {
+	v := getEnvVar(name)
+	_ = os.Unsetenv(name)
+	return v
+}
+
 func tempDir() string {
 	buf := make([]uint16, syscall.MAX_PATH)
 	n, _, _ := procGetTempPathW.Call(uintptr(len(buf)), uintptr(unsafe.Pointer(&buf[0])))

@@ -287,7 +287,7 @@ func Run(args []string) int {
 				return int(ExitError)
 			}
 			i++
-			opt.Password = getEnvVar(args[i])
+			opt.Password = takeEnvVar(args[i])
 			continue
 		case "--minimized":
 			if !optionsAllowed {

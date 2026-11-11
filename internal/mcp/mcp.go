@@ -6,6 +6,7 @@ package mcp
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ const ProtocolVersion = "2025-06-18"
 
 // JSON-RPC error codes.
 const (
+	CodeParse     = -32700
 	CodeNoMethod  = -32601
 	CodeBadParams = -32602
 	CodeInternal  = -32603
@@ -89,24 +91,50 @@ func (s *Server) Serve() error {
 	if s.Out == nil {
 		s.Out = os.Stdout
 	}
-	dec := json.NewDecoder(bufio.NewReaderSize(s.In, 1<<20))
+	// MCP over stdio frames one message per line. Read line by line instead
+	// of with a json.Decoder: a decoder keeps its first syntax error forever,
+	// so one bad message would turn the loop into a spin that answers nothing.
+	r := bufio.NewReaderSize(s.In, 1<<20)
 	enc := json.NewEncoder(s.Out)
 	for {
-		var req request
-		if err := dec.Decode(&req); err != nil {
-			if err == io.EOF {
+		line, rerr := r.ReadBytes('\n')
+		if rerr != nil && rerr != io.EOF {
+			return rerr
+		}
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			if rerr == io.EOF {
 				return nil
 			}
-			// One bad message must not end the session.
+			continue
+		}
+		var req request
+		if err := json.Unmarshal(line, &req); err != nil {
+			// One bad message must not end the session: say what went wrong
+			// and keep reading.
 			s.logf("bad message: %v", err)
+			res := &response{JSONRPC: "2.0", ID: json.RawMessage("null"),
+				Error: &RPCError{Code: CodeParse, Message: "parse error: " + err.Error()}}
+			if err := enc.Encode(res); err != nil {
+				return err
+			}
+			if rerr == io.EOF {
+				return nil
+			}
 			continue
 		}
 		// Notifications (no id) get no answer.
 		if len(req.ID) == 0 {
+			if rerr == io.EOF {
+				return nil
+			}
 			continue
 		}
 		if err := enc.Encode(s.handle(&req)); err != nil {
 			return err
+		}
+		if rerr == io.EOF {
+			return nil
 		}
 	}
 }

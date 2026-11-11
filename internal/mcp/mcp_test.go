@@ -203,3 +203,27 @@ func TestArgHelpers(t *testing.T) {
 		t.Error("ArgBool")
 	}
 }
+
+func TestABadMessageAnswersAParseErrorAndKeepsGoing(t *testing.T) {
+	replies := serve(t, testServer(), "{not json\n"+
+		`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`+"\n")
+	if len(replies) != 2 {
+		t.Fatalf("got %d replies, want a parse error and then the answer: %+v", len(replies), replies)
+	}
+	if replies[0].Error == nil || replies[0].Error.Code != CodeParse {
+		t.Fatalf("the first reply should be a parse error: %+v", replies[0])
+	}
+	if got := string(replies[0].ID); got != "null" {
+		t.Fatalf("a parse error answers id null, got %q", got)
+	}
+	if replies[1].Error != nil || string(replies[1].ID) != "1" {
+		t.Fatalf("the good message after it should still be answered: %+v", replies[1])
+	}
+}
+
+func TestAMessageWithoutATrailingNewlineIsServed(t *testing.T) {
+	replies := serve(t, testServer(), `{"jsonrpc":"2.0","id":7,"method":"tools/list"}`)
+	if len(replies) != 1 || string(replies[0].ID) != "7" {
+		t.Fatalf("the last line without a newline should be answered: %+v", replies)
+	}
+}

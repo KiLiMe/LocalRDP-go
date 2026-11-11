@@ -136,10 +136,7 @@ func mcpSessions() ([]map[string]any, error) {
 	out := make([]map[string]any, 0, len(items))
 	for i := range items {
 		it := items[i]
-		name := ""
-		if it.WinStationName != nil {
-			name = syscall.UTF16ToString(unsafe.Slice(it.WinStationName, 64))
-		}
+		name := it.WinStationName
 		out = append(out, map[string]any{
 			"id":         int(it.SessionID),
 			"name":       name,

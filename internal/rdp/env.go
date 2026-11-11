@@ -29,16 +29,25 @@ var (
 // wtsStateDown is WTS_CONNECTSTATE_CLASS's value for a session that is down.
 const wtsStateDown = 8
 
-// wtsSessionInfo 是 WTS_SESSION_INFO。
-type wtsSessionInfo struct {
+// wtsSessionInfoRaw is the WTS_SESSION_INFOW layout, used inside wtsSessions
+// only: its WinStationName points into the buffer WTSFreeMemory hands back.
+type wtsSessionInfoRaw struct {
 	SessionID      uint32
 	WinStationName *uint16
 	State          int32
 }
 
+// wtsSessionInfo is a copy of one session, with the name already a Go string
+// so it outlives the buffer it came from.
+type wtsSessionInfo struct {
+	SessionID      uint32
+	WinStationName string
+	State          int32
+}
+
 // wtsSessions 列出本机的 WTS 会话。
 func wtsSessions() []wtsSessionInfo {
-	var p *wtsSessionInfo
+	var p *wtsSessionInfoRaw
 	var count uint32
 	r, _, _ := procWTSEnumerateSessionsW.Call(0, 0, 1,
 		uintptr(unsafe.Pointer(&p)), uintptr(unsafe.Pointer(&count)))
@@ -46,8 +55,16 @@ func wtsSessions() []wtsSessionInfo {
 		return nil
 	}
 	defer procWTSFreeMemory.Call(uintptr(unsafe.Pointer(p)))
-	out := make([]wtsSessionInfo, int(count))
-	copy(out, unsafe.Slice(p, int(count)))
+	raw := unsafe.Slice(p, int(count))
+	out := make([]wtsSessionInfo, len(raw))
+	for i, it := range raw {
+		// 名字必须在缓冲区释放之前拷出来。
+		name := ""
+		if it.WinStationName != nil {
+			name = syscall.UTF16ToString(unsafe.Slice(it.WinStationName, 64))
+		}
+		out[i] = wtsSessionInfo{SessionID: it.SessionID, WinStationName: name, State: it.State}
+	}
 	return out
 }
 

@@ -47,7 +47,7 @@ func (a *actions) validate() (store.Session, bool) {
 		st.FormErr, st.FormErrOn = ui.T("The size is at least 320 by 200."), "width"
 		return s, false
 	}
-	if strings.ContainsAny(s.User, "\"`n\r") {
+	if badUserName(s.User) {
 		st.FormErr, st.FormErrOn = ui.T("The user name cannot hold a quote."), "user"
 		return s, false
 	}
@@ -56,6 +56,12 @@ func (a *actions) validate() (store.Session, bool) {
 		return s, false
 	}
 	return s, true
+}
+
+// badUserName reports a user name that would break the command line: a
+// quote or a line break.
+func badUserName(user string) bool {
+	return strings.ContainsAny(user, "\"\n\r")
 }
 
 // OpenSession starts the child session of the form.

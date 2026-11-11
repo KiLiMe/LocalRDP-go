@@ -32,7 +32,9 @@ func runSelf(args ...string) (string, int) {
 }
 
 // childCommand is the child session of the form as a command, with the
-// password in the environment where no other process can read it.
+// password in its environment rather than on the command line, so other users
+// cannot see it in the process list. Processes of the same user can still read
+// it; the child drops the variable as soon as it has read it (--password-env).
 func childCommand(s store.Session, password string) *exec.Cmd {
 	cmd := exec.Command(win32.ExePath(), s.Args()...)
 	cmd.Dir = win32.ExeDir()

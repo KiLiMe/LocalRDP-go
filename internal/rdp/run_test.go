@@ -1,6 +1,7 @@
 package rdp
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -54,5 +55,16 @@ func TestParseIntOption(t *testing.T) {
 	var ignored int
 	if parseIntOption(&j, bad, &ignored) {
 		t.Fatal("parseIntOption accepted a word")
+	}
+}
+
+func TestTakeEnvVarDropsIt(t *testing.T) {
+	const name = "LRDP_TEST_PW"
+	t.Setenv(name, "s3cret")
+	if got := takeEnvVar(name); got != "s3cret" {
+		t.Fatalf("takeEnvVar = %q, want the value", got)
+	}
+	if v, ok := os.LookupEnv(name); ok {
+		t.Fatalf("%s still set to %q: the processes we start would inherit the password", name, v)
 	}
 }
