@@ -30,10 +30,11 @@ func printHelp() {
 	printOut("  --width N          Initial window client width (even; default ~5/6 of the monitor)")
 	printOut("  --height N         Initial window client height")
 	printOut("  --x N --y N        Host window position")
-	printOut("  --scale N          Desktop scale percent 100-500 (default: follow window DPI)")
+	printOut("  --scale N          Desktop scale percent 100-500 (default: 100, the window's own pixels)")
 	printOut("  --size MODE        fit (default, window decides the resolution), fixed (window and")
-	printOut("                     session keep --width/--height, no resize border), or scale (keep")
-	printOut("                     the resolution, zoom the picture into the window)")
+	printOut("                     session keep --width/--height, no resize border), or scale (the")
+	printOut("                     resolution stays; a smaller window shrinks the picture to fit, a")
+	printOut("                     bigger one leaves it at its size, it is never stretched up)")
 	printOut("  --fullscreen       Start full screen (Ctrl+Alt+F to toggle)")
 	printOut("  --title TEXT       Host window title")
 	printOut("  --workdir DIR      Working directory for the launched program")
@@ -236,6 +237,13 @@ func Run(args []string) int {
 		case "--scale":
 			if !optionsAllowed || !parseIntOption(&i, args, &opt.Scale) {
 				return int(ExitError)
+			}
+			// The session takes 100-500; anything else is a slip, not a wish.
+			if opt.Scale < 100 {
+				opt.Scale = 100
+			}
+			if opt.Scale > 500 {
+				opt.Scale = 500
 			}
 			continue
 		case "--timeout":

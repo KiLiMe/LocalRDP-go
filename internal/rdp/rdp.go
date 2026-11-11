@@ -6,6 +6,7 @@ import (
 
 	"github.com/lxn/win"
 
+	"localrdp/internal/store"
 	"localrdp/internal/win32"
 )
 
@@ -234,30 +235,35 @@ func clientDesktopSize(hwnd win.HWND) (int32, int32) {
 	return w, h
 }
 
-// desktopSize is the size of the client area, or what the caller asked for
-// while the window is minimized or not laid out yet: a window started with
-// --minimized reports 0x0, and the session would open at 200x200.
 // viewSize is the desktop the control should use: the client area of the
-// window the control lives in, which already leaves the bar out.
+// window the control lives in, which already leaves the bar out, or what the
+// caller asked for while the window is minimized or not laid out yet (a
+// window started with --minimized reports 0x0, and the session would open at
+// 200x200).
 func viewSize(hwnd win.HWND, opt *StartOptions) (int32, int32) {
 	w, h := clientDesktopSize(hwnd)
-	if w >= 480 && h >= 320 {
+	if w >= kMinDesktopW && h >= kMinDesktopH {
 		return w, h
 	}
-	if opt != nil && opt.Width >= 480 && opt.Height >= 320 {
+	if opt != nil && opt.Width >= kMinDesktopW && opt.Height >= kMinDesktopH {
 		return int32(opt.Width), int32(opt.Height)
 	}
 	return 1280, 800
 }
 
-func resolveScale(hwnd win.HWND, opt *StartOptions) (int32, int32) {
+// resolveScale is the desktop scale the session starts with: --scale when
+// it is given, 100 otherwise.
+//
+// The window is already DPI aware (the process is per-monitor v2), so a
+// screen at 150% gives a window with 1.5 times the pixels, and the session
+// takes the window's pixels as its desktop. Handing the session the DPI
+// factor too made the guest lay out at 150% in that same pixel grid and then
+// SmartSizing stretched the result, which is the picture growing twice.
+// A machine that wants bigger text in the child session says so: --scale.
+func resolveScale(_ win.HWND, opt *StartOptions) (int32, int32) {
 	pct := int32(opt.Scale)
 	if pct <= 0 {
-		dpi := int32(windowDPI(uintptr(hwnd)))
-		if dpi == 0 {
-			dpi = 96
-		}
-		pct = (dpi*100 + 48) / 96
+		pct = 100
 	}
 	if pct < 100 {
 		pct = 100
@@ -360,7 +366,17 @@ func (h *axHost) configure(opt *StartOptions) bool {
 	advPut("RedirectSmartCards", varBool(false))
 	advPut("RedirectDevices", varBool(false))
 	advPut("RedirectPOSDevices", varBool(false))
-	advPut("SmartSizing", varBool(true))
+	// SmartSizing fits the session picture into the control, whatever the
+	// session desktop is — downwards only: a smaller window shrinks the whole
+	// picture, a bigger one leaves it at 1:1 in the middle. The control has no
+	// zoom property at all, so scale mode magnifies nothing by itself (raising
+	// --scale is what makes text bigger). Follow-window and scale both want it,
+	// fixed keeps the window at the session size, so it has nothing to fit.
+	//
+	// It goes in as a LONG: the property is a LONG, and a BOOL from the
+	// script interface does not set it.
+	stretches := store.NormalizeSizeMode(opt.SizeMode) != store.SizeFixed
+	advPut("SmartSizing", varI4(boolI4(stretches)))
 	advPut("EnableAutoReconnect", varBool(false))
 	advPut("MaxReconnectAttempts", varI4(0))
 	advPut("PerformanceFlags", varI4(0x00000190))
@@ -432,11 +448,17 @@ func (h *axHost) configure(opt *StartOptions) bool {
 	h.putExtendedBool("EnableFrameBufferRedirection", true)
 
 	ds, device := resolveScale(h.hwnd, opt)
+	if store.NormalizeSizeMode(opt.SizeMode) != store.SizeScale {
+		// Only the scale mode carries a --scale: fit works in the window's
+		// own pixels and fixed keeps what it connected with, so a scale on
+		// either of them would magnify the picture a second time.
+		ds, device = 100, deviceScaleFor(100)
+	}
 	h.putExtendedI4("DesktopScaleFactor", ds)
 	h.putExtendedI4("DeviceScaleFactor", device)
 
 	h.appliedW, h.appliedH, h.appliedScale = int(desk_w), int(desk_h), int(ds)
-	logf("Initial desktop %dx%d @%d%% dpi=%d", desk_w, desk_h, ds, windowDPI(uintptr(h.hwnd)))
+	logf("Initial desktop %dx%d @%d%% size=%s", desk_w, desk_h, ds, store.NormalizeSizeMode(opt.SizeMode))
 	return true
 }
 

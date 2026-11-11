@@ -41,6 +41,14 @@ type variant struct {
 
 var procVariantClear = syscall.NewLazyDLL("oleaut32.dll").NewProc("VariantClear")
 
+// boolI4 is a flag the control takes as a LONG.
+func boolI4(b bool) int32 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 func varI4(v int32) variant { return variant{VT: vtI4, val: uint64(uint32(v))} }
 
 func varBool(b bool) variant {

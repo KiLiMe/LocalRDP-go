@@ -64,11 +64,11 @@ localrdp click open           # 主窗口：打开子会话
 | `status` / `stop` | ✅ |
 | 窗口缩放 / DPI / 全屏（Ctrl+Alt+F） | ✅（登录后同步显示设置） |
 | 会话窗口顶栏：全屏 / 重连 / 断开 | ✅ 自绘 40px 栏，重连不关窗口 |
-| 窗口大小三档（固定 / 跟随 / 缩放） | ✅ `--size fit\|fixed\|scale` |
+| 窗口大小三档（固定 / 跟随 / 拉伸） | ✅ `--size fit\|fixed\|scale` |
 | 文本剪贴板 | ✅（RDP 自带重定向） |
 | `start -- 程序` | ⚠️ 需 `SeTcb` + `SeAssignPrimaryToken` |
 | 文件剪贴板桥 | ⚠️ 同上 |
-| `--scale N` | ✅ 桌面按 N% 渲染（见 Q5） |
+| `--scale N` | ✅ 桌面按 N% 渲染，默认 100 不跟屏幕 DPI（见 Q5） |
 
 需要特权时（`start` 模式）：按 **[手动授予特权.md](docs/手动授予特权.md)** 手动授予两项账户权限，
 然后注销重登一次，特权才进入令牌。程序里不再提供授权按钮。

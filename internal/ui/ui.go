@@ -100,10 +100,12 @@ type State struct {
 	// Busy is whether a child process runs, so the buttons wait for it.
 	Busy bool
 
-	// WidthText, HeightText and TimeoutText are the numbers, kept as
-	// typed so a half-written number does not turn into a zero.
+	// WidthText, HeightText, ScaleText and TimeoutText are the numbers,
+	// kept as typed so a half-written number does not turn into a zero.
+	// ScaleText is empty while the session asks for no scale at all.
 	WidthText   string
 	HeightText  string
+	ScaleText   string
 	TimeoutText string
 	// CustomRes is whether the size is the user's own, so the width and
 	// height may be typed in; a preset locks them.

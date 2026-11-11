@@ -80,6 +80,16 @@ func TestSessionArgsCarryTheSizeMode(t *testing.T) {
 	}
 }
 
+func TestSessionArgsCarryTheScale(t *testing.T) {
+	joined := strings.Join(Session{Width: 1280, Height: 800, SizeMode: SizeScale, Scale: 140}.Args(), " ")
+	if !strings.Contains(joined, "--scale 140") {
+		t.Fatalf("the scale is missing from the command line: %q", joined)
+	}
+	if got := (Session{Width: 1280, Height: 800, SizeMode: SizeScale}).Args(); strings.Contains(strings.Join(got, " "), "--scale") {
+		t.Fatalf("a session with no scale should not spell one out: %v", got)
+	}
+}
+
 func TestNormalizeSizeMode(t *testing.T) {
 	cases := map[string]string{
 		"":         SizeFit,

@@ -36,9 +36,12 @@ type Session struct {
 	Height int `json:"height,omitempty"`
 	// SizeMode says what the host window does with its size: SizeFit
 	// (default) lets the window decide the session resolution, SizeFixed
-	// pins both to Width×Height, SizeScale keeps the resolution and scales
-	// the picture into the window.
+	// pins both to Width×Height, SizeScale keeps the resolution and lets the
+	// window show that picture scaled down to fit.
 	SizeMode string `json:"size_mode,omitempty"`
+	// Scale is the desktop scale of the child session, 100 to 500; 0 asks
+	// for 100, the window's own pixels, and only SizeScale reads it.
+	Scale int `json:"scale,omitempty"`
 	// Title of the host window; empty for the default.
 	Title string `json:"title,omitempty"`
 	// FullScreen, Hidden and Minimized are the window's first state.
@@ -63,8 +66,9 @@ const (
 	// SizeFixed pins the window and the session to Width×Height, and takes
 	// the resize border away.
 	SizeFixed = "fixed"
-	// SizeScale keeps the session resolution and scales the picture into
-	// the window.
+	// SizeScale keeps the session resolution and fits the picture into the
+	// window: it shrinks when the window is smaller (SmartSizing never
+	// magnifies), and sits at 1:1 in the middle when the window is bigger.
 	SizeScale = "scale"
 )
 
@@ -137,6 +141,9 @@ func (s Session) Args() []string {
 	}
 	if m := NormalizeSizeMode(s.SizeMode); m != SizeFit {
 		args = append(args, "--size", m)
+	}
+	if s.Scale > 0 {
+		args = append(args, "--scale", fmt.Sprint(s.Scale))
 	}
 	if s.Timeout > 0 {
 		args = append(args, "--timeout", fmt.Sprint(s.Timeout))

@@ -108,6 +108,12 @@ func (st *State) formNumbers() {
 	if st.Form.Timeout < 5 {
 		st.Form.Timeout = 5
 	}
+	// The scale is the one number that may stay empty: no scale asked for
+	// is not the same as a scale of zero.
+	st.Form.Scale = 0
+	if n, err := strconv.Atoi(trimSpace(st.ScaleText)); err == nil && n > 0 {
+		st.Form.Scale = n
+	}
 }
 
 // currentUser is the account Windows is running, as DOMAIN\user.

@@ -39,6 +39,11 @@ func newApp(session store.Session, opts Options) *App {
 	st.TimeoutText = win32.Itoa(session.Timeout)
 	st.WidthText = win32.Itoa(session.Width)
 	st.HeightText = win32.Itoa(session.Height)
+	// The scale stays empty until someone types one: empty means "no scale
+	// asked for", which is not the same as 100. A remembered scale comes back.
+	if session.Scale > 0 {
+		st.ScaleText = win32.Itoa(session.Scale)
+	}
 	st.Sessions = opts.Sessions
 	st.Active = opts.Active
 	if st.Settings.Lang == "" {

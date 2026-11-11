@@ -36,7 +36,7 @@ type StartOptions struct {
 	Height     int
 	X          int
 	Y          int
-	Scale      int // 0 = follow host DPI; otherwise 100-500
+	Scale      int // 0 = no scale asked for (the window's own pixels); otherwise 100-500
 	TimeoutSec int
 	WorkDir    string
 	Title      string

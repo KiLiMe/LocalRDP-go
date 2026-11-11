@@ -320,6 +320,8 @@ func mcpTools() []mcp.Tool {
 				"password_env": mcp.Prop("string", "name of an environment variable holding the password"),
 				"width":        mcp.Prop("integer", "window client width"),
 				"height":       mcp.Prop("integer", "window client height"),
+				"size":         mcp.Prop("string", "fit, fixed or scale (the UI calls it stretch): what the window does with the session desktop (see docs/使用说明.md 5.2)"),
+				"scale":        mcp.Prop("integer", "desktop scale percent 100-500 (default: none, i.e. 100)"),
 				"fullscreen":   mcp.Prop("boolean", "open full screen"),
 				"title":        mcp.Prop("string", "host window title"),
 				"timeout":      mcp.Prop("integer", "connect timeout in seconds"),
@@ -429,6 +431,12 @@ func mcpLaunch(args map[string]any, start bool) (string, error) {
 	}
 	if v := mcp.ArgInt(args, "timeout", 0, 5, 3600); v > 0 {
 		cmd = append(cmd, "--timeout", win32.Itoa(v))
+	}
+	if v := strings.ToLower(mcp.ArgString(args, "size", "")); v != "" {
+		cmd = append(cmd, "--size", v)
+	}
+	if v := mcp.ArgInt(args, "scale", 0, 0, 500); v > 0 {
+		cmd = append(cmd, "--scale", win32.Itoa(v))
 	}
 	if t := mcp.ArgString(args, "title", ""); t != "" {
 		cmd = append(cmd, "--title", t)

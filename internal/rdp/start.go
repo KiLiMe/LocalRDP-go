@@ -27,6 +27,10 @@ func cmdStart(opt StartOptions) int {
 	if win.GetSystemMetrics(win.SM_REMOTESESSION) != 0 {
 		printOut("Note: running inside a remote session; the child desktop opens on this session's display.")
 	}
+	// From here on the window lifecycle starts: make sure the log exists
+	// before anything can return early, so a window that never opened still
+	// leaves a line behind.
+	logf("cmdStart begin: desktop=%v size=%s scale=%d w=%d h=%d", opt.Desktop, store.NormalizeSizeMode(opt.SizeMode), opt.Scale, opt.Width, opt.Height)
 	if sid := getChildSessionID(); sid != kNoSession {
 		if sessionAlive(sid) {
 			printOutf("A child session already exists (id=%d). Run `localrdp stop` first.", sid)
@@ -50,6 +54,7 @@ func cmdStart(opt StartOptions) int {
 		logf("Job file: %s", job)
 	}
 	code := RunRdpSession(opt, job)
+	logf("cmdStart end: code=%d", code)
 	if job != "" {
 		deleteJobFile(job)
 	}

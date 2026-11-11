@@ -31,6 +31,12 @@ const (
 
 	// hotkeyFullScreen is the id of the Ctrl+Alt+F hot key this window claims.
 	hotkeyFullScreen = 1
+
+	// kMinDesktopW, kMinDesktopH are the smallest desktop the session takes.
+	// The window cannot be dragged smaller than this, and anything below it
+	// (a minimized window reports 0x0) is not a size to negotiate.
+	kMinDesktopW = 480
+	kMinDesktopH = 320
 )
 
 type hostState struct {
@@ -73,6 +79,9 @@ type hostState struct {
 	// baseScale is the desktop scale factor the session was started with; scale
 	// mode keeps the same visual size when the resolution grows.
 	baseScale int32
+	// modeBeforeFullscreen is the size mode full screen turned off, and what
+	// leaving full screen turns back on; empty when there is none.
+	modeBeforeFullscreen string
 	// fixedW, fixedH are the outer size a fixed window is locked to.
 	fixedW, fixedH int32
 	watchdogTicks  int
@@ -99,7 +108,9 @@ type hostState struct {
 var gHost *hostState
 
 // viewSize is the desktop the session should use now: the control's window,
-// which leaves the bar out (and the bar is hidden in full screen).
+// which leaves the bar out (and the bar is hidden in full screen). It is the
+// same size the session connected with, from the same function, so dragging
+// the window does not quietly change the meaning of "the window's pixels".
 func (s *hostState) viewSize() (int32, int32) {
 	hwnd := s.view
 	if hwnd == 0 {
@@ -140,6 +151,7 @@ func (s *hostState) grip() int32 {
 	return kGrip
 }
 
+// maxI32 keeps a size at least at the floor.
 func maxI32(a, b int32) int32 {
 	if a > b {
 		return a
@@ -147,35 +159,27 @@ func maxI32(a, b int32) int32 {
 	return b
 }
 
+// applyDisplay says the size the session desktop should have now. Fit is the
+// only mode that changes it: fixed and scale keep the resolution the session
+// connected with, and the control fits that picture into the window (scale;
+// SmartSizing shrinks but never magnifies), or the window never moves away
+// from it (fixed).
 func applyDisplay(s *hostState) bool {
 	if s.host == nil || s.host.disp == nil || !s.loggedIn {
 		return false
 	}
 	w, h := s.viewSize()
-	ds, dev := resolveScale(s.hwnd, &s.opt)
+	ds := s.explicitScale()
 	if s.sizeMode != store.SizeFit {
 		if s.baseW <= 0 || s.baseH <= 0 {
 			// 还没连上，基准尺寸未知，先不动。
 			return true
 		}
-		if s.sizeMode == store.SizeFixed {
-			// 窗口动不了，会话分辨率就停在连接时的大小。
-			w, h, ds = s.baseW, s.baseH, s.baseScale
-		} else {
-			// 缩放：分辨率锁在连接时的大小，窗口变大就把桌面按比例放大，
-			// 桌面上的窗口布局不变（RDCMan 的 scale to fit 那一路）。
-			ratio := (100*w + s.baseW/2) / s.baseW
-			if alt := (100*h + s.baseH/2) / s.baseH; alt < ratio {
-				ratio = alt
-			}
-			w, h = s.baseW, s.baseH
-			ds = clampI32(ratio, 100, 500)
-			if s.baseScale > 100 {
-				ds = clampI32(ds*s.baseScale/100, 100, 500)
-			}
-		}
-		dev = deviceScaleFor(ds)
+		// 固定与缩放都不换分辨率：会话一直是连接时那个桌面，
+		// 只有窗口在动（缩放档由 SmartSizing 把画面缩到放得下，放大不了）。
+		w, h, ds = s.baseW, s.baseH, s.baseScale
 	}
+	dev := deviceScaleFor(ds)
 	if int(w) == s.appliedW && int(h) == s.appliedH && int(ds) == s.appliedScale {
 		return true
 	}
@@ -226,6 +230,20 @@ func clampI32(v, lo, hi int32) int32 {
 	return v
 }
 
+// explicitScale is the desktop scale the user asked for with --scale; 0 asks
+// for no scaling at all. Nothing follows the screen's DPI any more: the
+// window is DPI aware already, so its pixels are the desktop's pixels.
+func (s *hostState) explicitScale() int32 {
+	// Only the scale mode asks for a desktop scale: fit follows the window's
+	// pixels and fixed keeps the size it connected with, so a --scale on
+	// either of them would magnify on top of that.
+	if s.sizeMode != store.SizeScale {
+		return 100
+	}
+	ds, _ := resolveScale(s.hwnd, &s.opt)
+	return ds
+}
+
 // toggleFullscreen flips full screen. Ctrl+Alt+F reaches both this window and
 // the control, which would otherwise toggle twice.
 func (s *hostState) toggleFullscreen() {
@@ -249,6 +267,18 @@ func (s *hostState) toggleAllowed() bool {
 	return true
 }
 
+// suspendSizeModeForFullscreen hands the window to the screen while it is
+// full screen: fixed and scale would keep the session at a desktop that is
+// not the one filling the screen. leaveFullscreen puts the mode back.
+func (s *hostState) suspendSizeModeForFullscreen() {
+	if s.sizeMode == store.SizeFit {
+		return
+	}
+	logWarn("全屏模式忽略 size=" + s.sizeMode + "，按跟随屏幕处理")
+	s.modeBeforeFullscreen = s.sizeMode
+	s.sizeMode = store.SizeFit
+}
+
 func (s *hostState) enterFullscreen() {
 	if s.hwnd == 0 || s.fullscreen {
 		return
@@ -265,6 +295,8 @@ func (s *hostState) enterFullscreen() {
 	mi.CbSize = uint32(unsafe.Sizeof(mi))
 	win.GetMonitorInfo(mon, &mi)
 	s.fullscreen = true
+	// 全屏就是让画面填满屏幕：先把尺寸档交给屏幕，退出全屏再拿回来。
+	s.suspendSizeModeForFullscreen()
 	win.SetWindowLongPtr(s.hwnd, win.GWL_STYLE, uintptr(win.WS_POPUP|win.WS_VISIBLE))
 	win.SetWindowLongPtr(s.hwnd, win.GWL_EXSTYLE, uintptr(s.restoreExStyle&^uint32(win.WS_EX_WINDOWEDGE)))
 	win.SetWindowPos(s.hwnd, win.HWND_TOP, mi.RcMonitor.Left, mi.RcMonitor.Top,
@@ -289,6 +321,15 @@ func (s *hostState) leaveFullscreen() {
 	s.fullscreen = false
 	s.host.setFullScreen(false)
 	s.resizeAx()
+	if s.modeBeforeFullscreen != "" {
+		// 全屏期间停用的尺寸模式回来了。
+		s.sizeMode = s.modeBeforeFullscreen
+		s.modeBeforeFullscreen = ""
+		logf("恢复窗口尺寸模式 %s", s.sizeMode)
+	}
+	// 全屏把会话改成了屏幕大小，回到窗口后要把分辨率改回来。固定与缩放
+	// 都在这里拿回连接时的基准，不等 WM_SIZE（固定和缩放档的 WM_SIZE 不重设）。
+	applyDisplay(s)
 	win.PostMessage(s.hwnd, win.WM_SIZE, 0, 0)
 	win.InvalidateRect(s.hwnd, nil, true)
 	s.layoutOverlay()
@@ -327,7 +368,8 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		s.invalidateBar()
 		if s.baseW == 0 {
 			s.baseW, s.baseH = s.viewSize()
-			s.baseScale, _ = resolveScale(s.hwnd, &s.opt)
+			// 连接时的缩放就是基准：scale 档以后按窗口/基准的比例往上走。
+			s.baseScale = s.explicitScale()
 			logf("会话尺寸基准 %dx%d（size=%s）", s.baseW, s.baseH, s.sizeMode)
 		}
 		if s.opt.Fullscreen {
@@ -508,7 +550,14 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		s.layoutOverlay()
 		s.resizeAx()
 		if s.sizeMode == store.SizeFixed {
-			// 固定大小：窗口动不了，画面也不用重设。
+			// 固定大小：窗口拖不动，但进出全屏后会话要回到连接时的大小，
+			// 所以照样对齐一次（没变的时候 applyDisplay 自己就返回了）。
+			applyDisplay(s)
+			return 0
+		}
+		if s.sizeMode == store.SizeScale {
+			// 缩放：会话分辨率不变，画面由控件的 SmartSizing 缩到放得下
+			// （只缩不放），不用去重设显示设置（退出全屏时 leaveFullscreen 会再对齐一次）。
 			return 0
 		}
 		win.SetTimer(hwnd, kTimerResize, 400, 0)
@@ -522,6 +571,10 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 				win.SWP_NOZORDER|win.SWP_NOACTIVATE)
 		}
 		s.resizeAx()
+		if s.sizeMode == store.SizeScale {
+			// 缩放档的分辨率不跟窗口走，画面只是被缩到放得下，DPI 变了也不用重设。
+			return 0
+		}
 		win.SetTimer(hwnd, kTimerResize, 400, 0)
 		return 0
 	case win.WM_ERASEBKGND:
@@ -760,10 +813,10 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 
 	s := &hostState{opt: opt, jobPath: jobPath, host: newAxHost()}
 	s.sizeMode = store.NormalizeSizeMode(opt.SizeMode)
-	if opt.Fullscreen && s.sizeMode != store.SizeFit {
-		// 全屏就是让画面填满屏幕，和“窗口尺寸固定”冲突：全屏优先。
-		logWarn("全屏模式忽略 size=" + s.sizeMode + "，按跟随屏幕处理")
-		s.sizeMode = store.SizeFit
+	if opt.Fullscreen {
+		// 全屏就是让画面填满屏幕，和尺寸档冲突：全屏优先。
+		// 只停用全屏期间的模式，退出全屏后照旧生效。
+		s.suspendSizeModeForFullscreen()
 	}
 	logf("窗口尺寸模式 %s", s.sizeMode)
 	gHost = s

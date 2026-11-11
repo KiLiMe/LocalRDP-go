@@ -51,6 +51,10 @@ func (a *actions) validate() (store.Session, bool) {
 		st.FormErr, st.FormErrOn = ui.T("The user name cannot hold a quote."), "user"
 		return s, false
 	}
+	if s.Scale < 0 || s.Scale > 500 || (s.Scale > 0 && s.Scale < 100) {
+		st.FormErr, st.FormErrOn = ui.T("The scale is between 100 and 500 percent, or empty."), "scale"
+		return s, false
+	}
 	return s, true
 }
 

@@ -268,7 +268,15 @@ func (st *State) displayCard(c *myui.Context) {
 			myui.Column(c).Grow(1).Basis(0).MinWidth(0).Children(func() {
 				st.field(c, "height", T("Height"), func() { st.lockedInput(c, "height", &st.HeightText) })
 			})
+			myui.Column(c).Grow(0.6).Basis(0).MinWidth(0).Children(func() {
+				st.field(c, "scale", T("Scale")+" %", func() {
+					myui.TextInput(c.Key("scale"), &st.ScaleText).Height(30).
+						Placeholder(T("None"))
+				})
+			})
 		})
+		myui.Text(c, T("Scale percent from 100 to 500, empty for none: it sizes the desktop, and the picture is fitted into the window, never stretched past its size.")).
+			FontSize(11).TextColor(t.TextMuted).Wrap()
 		myui.Divider(c)
 		myui.Text(c, T("Window and connection")).FontSize(12).TextColor(t.TextMuted)
 		myui.Row(c).Gap(18).Wrap().Children(func() {
@@ -343,7 +351,7 @@ func (st *State) sizeHint() string {
 	case store.SizeFit:
 		return T("Follow: the desktop takes the size of the window, so the window can be dragged and text shrinks and grows with it.")
 	case store.SizeScale:
-		return T("Scale: the desktop keeps its resolution and the window magnifies it, so text gets bigger, not sharper.")
+		return T("Stretch: the desktop keeps its resolution; a smaller window shrinks the whole picture to fit, a bigger window leaves it at its size in the middle.")
 	}
 	return T("Fixed: the window and the desktop stay at the width and height below.")
 }
@@ -357,7 +365,7 @@ func (st *State) sizeChoice(c *myui.Context) {
 		st.sizeModeSeen = st.Form.SizeMode
 	}
 	myui.Segmented(c.Key("size"), &st.SizeIndex,
-		T("Fixed size"), T("Follow window"), T("Scale"))
+		T("Fixed size"), T("Follow window"), T("Stretch"))
 	if i := st.SizeIndex; i >= 0 && i < len(modes) && modes[i] != st.Form.SizeMode {
 		st.Form.SizeMode = modes[i]
 		st.sizeModeSeen = modes[i]
