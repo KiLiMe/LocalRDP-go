@@ -786,36 +786,42 @@ func screenPoint(lParam uintptr) win.POINT {
 }
 
 // defaultWindowRect 按 C++ 的规则算客户区：工作区 5/6，宽取偶，居中。
-func defaultWindowRect(opt *StartOptions) (int32, int32, int32, int32) {
+//
+// 要的尺寸比工作区还大时按工作区截断：比屏幕还大的窗口有一半落在屏幕外，
+// 顶栏（拖动、关闭都靠它）跟着看不见——高分辨率配小屏幕时就是这样。
+func defaultWindowRect(opt *StartOptions) (x, y, cw, ch int32, clamped bool) {
 	wa := primaryWorkArea()
 	w := int(wa.Right - wa.Left)
 	h := int(wa.Bottom - wa.Top)
-	cw := 800
-	ch := 600
-	if x := w * 5 / 6; x > cw {
-		cw = x
+	sizeW := 800
+	sizeH := 600
+	if v := w * 5 / 6; v > sizeW {
+		sizeW = v
 	}
-	if y := h * 5 / 6; y > ch {
-		ch = y
+	if v := h * 5 / 6; v > sizeH {
+		sizeH = v
 	}
-	cw &^= 1
-	x := int(wa.Left) + (w-cw)/2
-	y := int(wa.Top) + (h-ch)/2
 	if opt.Width > 0 {
-		cw = opt.Width &^ 1
-		x = int(wa.Left) + (w-cw)/2
+		sizeW = opt.Width &^ 1
 	}
 	if opt.Height > 0 {
-		ch = opt.Height + int(barHeightFor(opt))
-		y = int(wa.Top) + (h-ch)/2
+		sizeH = opt.Height + int(barHeightFor(opt))
 	}
+	if sizeW > w {
+		sizeW, clamped = w&^1, true
+	}
+	if sizeH > h {
+		sizeH, clamped = h, true
+	}
+	x = int32(int(wa.Left) + (w-sizeW)/2)
+	y = int32(int(wa.Top) + (h-sizeH)/2)
 	if opt.X != cwUseDefault {
-		x = opt.X
+		x = int32(opt.X)
 	}
 	if opt.Y != cwUseDefault {
-		y = opt.Y
+		y = int32(opt.Y)
 	}
-	return int32(x), int32(y), int32(cw), int32(ch)
+	return x, y, int32(sizeW), int32(sizeH), clamped
 }
 
 // RunRdpSession 对应 src/rdp_host.cpp 的 RunRdpSession()。
@@ -855,7 +861,12 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	logf("窗口尺寸模式 %s", s.sizeMode)
 	gHost = s
 
-	x, y, cw, ch := defaultWindowRect(&opt)
+	x, y, cw, ch, clamped := defaultWindowRect(&opt)
+	if clamped {
+		// 尺寸是用户要的，但屏幕放不下：说一声，免得以为是自己填错了。
+		printOutf("The window does not fit the screen; using %dx%d.", cw, ch)
+		logf("屏幕放不下，窗口改成 %dx%d", cw, ch)
+	}
 	style := uint32(win.WS_OVERLAPPEDWINDOW | win.WS_CLIPCHILDREN | win.WS_CLIPSIBLINGS)
 	exStyle := uint32(win.WS_EX_APPWINDOW)
 	show := int32(win.SW_SHOW)

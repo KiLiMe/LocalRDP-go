@@ -47,7 +47,7 @@ var zh = map[string]string{
 	"Follow window": "跟随窗口",
 	"Scale":         "缩放",
 	"Stretch":       "拉伸",
-	"Fixed: the window and the desktop stay at the width and height below.":                                                                              "固定：窗口与桌面恒为下面的宽×高，不能拖动。",
+	"Fixed: the window and the desktop stay at the width and height below (a screen that cannot hold that size cuts them down).":                         "固定：窗口与桌面恒为下面的宽×高，不能拖动；屏幕放不下时按工作区截断。",
 	"Follow: the desktop takes the size of the window, so the window can be dragged and text shrinks and grows with it.":                                 "跟随：桌面取窗口的尺寸，窗口可以拖动，字随之变小变大。",
 	"Stretch: the desktop keeps its resolution; a smaller window shrinks the whole picture to fit, a bigger window leaves it at its size in the middle.": "拉伸：桌面保持自己的分辨率；窗口比桌面小时整幅画面缩小铺满，比桌面大时保持原尺寸居中（不放大）。",
 	"Scale percent from 100 to 500, empty for none: it sizes the desktop, and the picture is fitted into the window, never stretched past its size.":     "缩放百分比 100–500，留空即不设（默认空）；它决定桌面按多大像素排版，窗口只把画面缩到放得下，不会放大。",
