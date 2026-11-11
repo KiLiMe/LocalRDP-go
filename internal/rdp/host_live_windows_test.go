@@ -10,6 +10,7 @@ package rdp
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,6 +27,7 @@ var (
 	liveBuildOnce sync.Once
 	liveExePath   string
 	liveBuildErr  error
+	dpiAwareOnce  sync.Once
 )
 
 // liveExe 返回被测的 exe：这些测试驱动的是真程序，所以二进制得由当前代码编出来。
@@ -60,6 +62,28 @@ func sessionWindow() win.HWND {
 	return win.FindWindow(win32.UTF16Ptr(className), nil)
 }
 
+// dpiAwareTestProcess 把测试进程设成 dpi 感知：不设的话 Windows 交给它的是
+// 除以 dpi 的坐标，1536 像素的窗口会报成 1024，断言就成了白过。
+//
+// 必须在测试进程碰过 user32 之前调：awareness 是进程级的，一旦系统已经按某个值的
+// 赢了口，再改就是无声失败（SetProcessDpiAwarenessContext 返回 false），所以这里
+// 由 TestMain 在最前面调一次，startSession 里的调用只是兑地方。
+func dpiAwareTestProcess() {
+	dpiAwareOnce.Do(func() {
+		procDpiAware := user32.NewProc("SetProcessDpiAwarenessContext")
+		// DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 是 -4，其余几条也一样。
+		if ok, _, err := procDpiAware.Call(uintptr(^uintptr(3))); ok == 0 {
+			fmt.Printf("warning: SetProcessDpiAwarenessContext failed (%v); window coordinates will be virtualized\n", err)
+		}
+	})
+}
+
+// TestMain 先把进程的 dpi 感知设好，再跑其余测试。
+func TestMain(m *testing.M) {
+	dpiAwareTestProcess()
+	os.Exit(m.Run())
+}
+
 // stopSessions 让 `localrdp stop` 注销子会话并等窗口消失，下一次 FindWindow 才不会抓到
 // 上一个。注销本身可能要几十秒（会话在半连接状态下被杀时实测 30 秒），所以给它一个上限。
 func stopSessions(t *testing.T, exe string) {
@@ -78,6 +102,7 @@ func stopSessions(t *testing.T, exe string) {
 // startSession 起一个 desktop 会话并等它的窗口出现，返回窗口句柄和收尾函数。
 func startSession(t *testing.T, exe string, args ...string) (win.HWND, func()) {
 	t.Helper()
+	dpiAwareTestProcess()
 	if sessionWindow() != 0 {
 		t.Skip("a session window is already open; close it before running the live tests")
 	}
@@ -142,14 +167,19 @@ func TestLiveFittingSessionIsUsedAsIs(t *testing.T) {
 	exe := liveExe(t)
 	for _, mode := range []string{"fixed", "fit", "scale"} {
 		t.Run(mode, func(t *testing.T) {
+			// dpi 得在开会话之前量：子会话一接管控制台，本会话的桌面就不在任何显示器
+			// 上，这时候 GetDpiForWindow 回落成 96，而后台进程开窗时量到的是 144。
+			dpi := startDPI(nil)
 			hwnd, done := startSession(t, exe, "--size", mode, "--width", "1200", "--height", "800", "--timeout", "120")
 			defer done()
 			var c win.RECT
 			if !win.GetClientRect(hwnd, &c) {
 				t.Fatal("cannot measure the session window")
 			}
-			if c.Right != 1200 || c.Bottom != 800+kBarH {
-				t.Fatalf("client = %dx%d, want 1200x%d (800 plus the bar)", c.Right, c.Bottom, 800+kBarH)
+			wantW := int32(dpiPx(1200, dpi))
+			wantB := int32(dpiPx(800, dpi)) + newBarMetrics(dpi).h
+			if c.Right != wantW || c.Bottom != wantB {
+				t.Fatalf("client = %dx%d, want %dx%d (800 plus the bar, at dpi %d)", c.Right, c.Bottom, wantW, wantB, dpi)
 			}
 		})
 	}

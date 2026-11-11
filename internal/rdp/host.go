@@ -46,6 +46,8 @@ type hostState struct {
 	host   *axHost
 	hwnd   win.HWND
 	axHwnd win.HWND
+	// m is the bar's numbers for the dpi of the screen the window is on.
+	m barMetrics
 	// view is the child window the control lives in: the bar above it belongs
 	// to this process, so the control gets the rest of the window.
 	view win.HWND
@@ -150,7 +152,7 @@ func (s *hostState) grip() int32 {
 	if !s.resizable || s.fullscreen || s.sizeMode == store.SizeFixed {
 		return 0
 	}
-	return kGrip
+	return s.m.grip
 }
 
 // maxI32 keeps a size at least at the floor.
@@ -595,6 +597,8 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 		win.SetTimer(hwnd, kTimerResize, 400, 0)
 		return 0
 	case win.WM_DPICHANGED:
+		// 顶栏的尺寸跟着 dpi 走：拖到另一块屏上时重新算一遍。
+		s.setDPI(windowDPI(uintptr(hwnd)))
 		if s.sizeMode == store.SizeFixed || win.IsIconic(hwnd) {
 			return 0
 		}
@@ -787,9 +791,12 @@ func screenPoint(lParam uintptr) win.POINT {
 
 // defaultWindowRect 按 C++ 的规则算客户区：工作区 5/6，宽取偶，居中。
 //
+// 用户填的宽高是 100% 下的尺寸：窗口在 150% 的屏上就开 1.5 倍的像素，
+// 子会话桌面才和主机的窗口一样大——否则画面和顶栏都只有三分之二。
+//
 // 要的尺寸比工作区还大时按工作区截断：比屏幕还大的窗口有一半落在屏幕外，
 // 顶栏（拖动、关闭都靠它）跟着看不见——高分辨率配小屏幕时就是这样。
-func defaultWindowRect(opt *StartOptions) (x, y, cw, ch int32, clamped bool) {
+func defaultWindowRect(opt *StartOptions, dpi uint32) (x, y, cw, ch int32, clamped bool) {
 	wa := primaryWorkArea()
 	w := int(wa.Right - wa.Left)
 	h := int(wa.Bottom - wa.Top)
@@ -802,10 +809,10 @@ func defaultWindowRect(opt *StartOptions) (x, y, cw, ch int32, clamped bool) {
 		sizeH = v
 	}
 	if opt.Width > 0 {
-		sizeW = opt.Width &^ 1
+		sizeW = dpiPx(opt.Width, dpi) &^ 1
 	}
 	if opt.Height > 0 {
-		sizeH = opt.Height + int(barHeightFor(opt))
+		sizeH = dpiPx(opt.Height, dpi) + int(barHeightFor(opt, dpi))
 	}
 	if sizeW > w {
 		sizeW, clamped = w&^1, true
@@ -862,7 +869,7 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	}
 	defer win.OleUninitialize()
 
-	s := &hostState{opt: opt, jobPath: jobPath, host: newAxHost()}
+	s := &hostState{opt: opt, jobPath: jobPath, host: newAxHost(), m: newBarMetrics(startDPI(&opt))}
 	s.sizeMode = store.NormalizeSizeMode(opt.SizeMode)
 	if opt.Fullscreen {
 		// 全屏就是让画面填满屏幕，和尺寸档冲突：全屏优先。
@@ -872,7 +879,7 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	logf("窗口尺寸模式 %s", s.sizeMode)
 	gHost = s
 
-	x, y, cw, ch, clamped := defaultWindowRect(&opt)
+	x, y, cw, ch, clamped := defaultWindowRect(&opt, s.m.dpi)
 	if clamped {
 		// 尺寸是用户要的，但屏幕放不下：说一声，免得以为是自己填错了。
 		printOutf("The window does not fit the screen; using %dx%d.", cw, ch)
@@ -962,8 +969,8 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	var created bool
 	// 控件住在一个子窗口里：上面的栏是本进程画的，控件只管栏下面那块，
 	// 四周再留一圈给鼠标拖拽改大小。
-	bar := barHeightFor(&opt)
-	grip := int32(kGrip)
+	bar := barHeightFor(&opt, s.m.dpi)
+	grip := s.m.grip
 	if !s.resizable || s.sizeMode == store.SizeFixed {
 		grip = 0
 	}

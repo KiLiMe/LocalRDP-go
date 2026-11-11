@@ -16,11 +16,13 @@ import (
 // the bar without connecting to anything.
 //
 //	go run -tags barpreview ./tools/barpreview
-func PreviewBar(path string, width int32, rows []barModel) error {
-	const height = int32(kBarH)
+func PreviewBar(path string, width, dpi int32, rows []barModel) error {
+	m := newBarMetrics(uint32(dpi))
+	height := m.h
 	img := image.NewNRGBA(image.Rect(0, 0, int(width), int(height)*len(rows)))
-	for i, m := range rows {
-		row, err := renderDIB(width, height, func(hdc win.HDC) { m.paint(hdc, width, height) })
+	for i, bm := range rows {
+		bm.m = m
+		row, err := renderDIB(width, height, func(hdc win.HDC) { bm.paint(hdc, width, height) })
 		if err != nil {
 			return err
 		}
@@ -31,11 +33,12 @@ func PreviewBar(path string, width int32, rows []barModel) error {
 
 // PreviewOverlay renders the floating bar, one row per hovered button: 0 for
 // none, then the three commands, in the order the bar lays them out.
-func PreviewOverlay(path string, hovers []uintptr) error {
-	width, height := overlaySize()
+func PreviewOverlay(path string, dpi int32, hovers []uintptr) error {
+	m := newBarMetrics(uint32(dpi))
+	width, height := overlaySize(m)
 	img := image.NewNRGBA(image.Rect(0, 0, int(width), int(height)*len(hovers)))
 	for i, h := range hovers {
-		s := &hostState{overlayHover: h}
+		s := &hostState{overlayHover: h, m: m}
 		row, err := renderDIB(width, height, func(hdc win.HDC) { s.drawOverlay(hdc) })
 		if err != nil {
 			return err
@@ -110,7 +113,7 @@ type BarModelForPreview struct {
 
 // PreviewBarFile is PreviewBar for the model a caller outside this package
 // can name.
-func PreviewBarFile(path string, width int32, rows []BarModelForPreview) error {
+func PreviewBarFile(path string, width, dpi int32, rows []BarModelForPreview) error {
 	ms := make([]barModel, len(rows))
 	for i, r := range rows {
 		sid := r.Sid
@@ -119,8 +122,10 @@ func PreviewBarFile(path string, width int32, rows []BarModelForPreview) error {
 		}
 		ms[i] = barModel{loggedIn: r.LoggedIn, everConnected: r.EverConnected, sid: sid, hover: r.Hover}
 	}
-	return PreviewBar(path, width, ms)
+	return PreviewBar(path, width, dpi, ms)
 }
 
 // PreviewOverlayFile is PreviewOverlay, for a caller outside this package.
-func PreviewOverlayFile(path string, hovers []uintptr) error { return PreviewOverlay(path, hovers) }
+func PreviewOverlayFile(path string, dpi int32, hovers []uintptr) error {
+	return PreviewOverlay(path, dpi, hovers)
+}

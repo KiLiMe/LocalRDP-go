@@ -33,18 +33,18 @@ var (
 
 // overlaySize is the floating bar's size: the three buttons with a padding on
 // both sides, as tall as the bar itself.
-func overlaySize() (int32, int32) {
+func overlaySize(m barMetrics) (int32, int32) {
 	hdc := win.GetDC(0)
 	if hdc == 0 {
 		return 0, 0
 	}
-	btns := barModel{}.buttons(hdc, 1<<14)
+	btns := barModel{m: m}.buttons(hdc, 1<<14)
 	win.ReleaseDC(0, hdc)
 	if len(btns) == 0 {
 		return 0, 0
 	}
-	total := (1 << 14) - barPad - btns[len(btns)-1].rect.Left
-	return total + 2*barPad, kBarH
+	total := (1 << 14) - m.pad - btns[len(btns)-1].rect.Left
+	return total + 2*m.pad, m.h
 }
 
 // createOverlay makes the floating bar. It stays hidden until the window goes
@@ -53,7 +53,7 @@ func (s *hostState) createOverlay(inst win.HINSTANCE) {
 	if s.overlay != 0 || s.hwnd == 0 {
 		return
 	}
-	w, h := overlaySize()
+	w, h := overlaySize(s.m)
 	if w == 0 || h == 0 {
 		return
 	}
@@ -91,7 +91,7 @@ func (s *hostState) layoutOverlay() {
 		win.ShowWindow(s.overlay, win.SW_HIDE)
 		return
 	}
-	w, h := overlaySize()
+	w, h := overlaySize(s.m)
 	cw, _ := clientDesktopSize(s.hwnd)
 	x := (cw - w) / 2
 	if x < 0 {
@@ -115,7 +115,7 @@ func (s *hostState) trackOverlay() {
 	if !win.ScreenToClient(s.hwnd, &pt) {
 		return
 	}
-	_, h := overlaySize()
+	_, h := overlaySize(s.m)
 	show := pt.Y >= 0 && pt.Y <= kOverlayReveal
 	if !show && s.overlayShown {
 		// The pointer is on its way down from the edge to the buttons.
@@ -131,11 +131,11 @@ func (s *hostState) trackOverlay() {
 // overlayModel is what the floating bar draws with: the same three buttons as
 // the bar, with the one under the pointer lit.
 func (s *hostState) overlayModel() barModel {
-	return barModel{hover: s.overlayHover}
+	return barModel{m: s.m, hover: s.overlayHover}
 }
 
 func (s *hostState) drawOverlay(hdc win.HDC) {
-	w, h := overlaySize()
+	w, h := overlaySize(s.m)
 	fillSolid(hdc, win.RECT{Right: w, Bottom: h}, barBg)
 	win.SetBkMode(hdc, win.TRANSPARENT)
 	m := s.overlayModel()
@@ -145,26 +145,26 @@ func (s *hostState) drawOverlay(hdc win.HDC) {
 		if b.cmd == m.hover {
 			bg = b.hi
 		}
-		fillRoundBorder(hdc, b.rect, bg, b.bd, 7)
-		at := b.rect.Left + barBtnPad
-		barGlyph(hdc, b.glyph, win.RECT{Left: at, Top: b.rect.Top, Right: at + barBtnIcon, Bottom: b.rect.Bottom + 1},
-			b.fg, 11)
-		barText(hdc, b.label, &win.RECT{Left: at + barBtnIcon + barIconGap, Top: b.rect.Top,
-			Right: b.rect.Right - barBtnPad + 2, Bottom: b.rect.Bottom},
-			b.fg, barFont(12, win.FW_NORMAL), win.DT_LEFT|win.DT_VCENTER|win.DT_SINGLELINE)
+		fillRoundBorder(hdc, b.rect, bg, b.bd, m.m.radius)
+		at := b.rect.Left + m.m.btnPad
+		barGlyph(hdc, b.glyph, win.RECT{Left: at, Top: b.rect.Top, Right: at + m.m.btnIcon, Bottom: b.rect.Bottom + 1},
+			b.fg, m.m.btnGlyph)
+		barText(hdc, b.label, &win.RECT{Left: at + m.m.btnIcon + m.m.iconGap, Top: b.rect.Top,
+			Right: b.rect.Right - m.m.btnPad + 2, Bottom: b.rect.Bottom},
+			b.fg, barFont(m.m.font, win.FW_NORMAL), win.DT_LEFT|win.DT_VCENTER|win.DT_SINGLELINE)
 	}
 	// 一条上边线，和顶栏一样，浮在画面上时不至于糊在一起。
 	fillSolid(hdc, win.RECT{Right: w, Bottom: 1}, barLine)
 }
 
 // overlayAt is the command of the button at x, y of the floating bar.
-func overlayAt(x, y int32) uintptr {
-	w, _ := overlaySize()
+func overlayAt(m barMetrics, x, y int32) uintptr {
+	w, _ := overlaySize(m)
 	hdc := win.GetDC(0)
 	if hdc == 0 {
 		return 0
 	}
-	btns := barModel{}.buttons(hdc, w)
+	btns := barModel{m: m}.buttons(hdc, w)
 	win.ReleaseDC(0, hdc)
 	for _, b := range btns {
 		if x >= b.rect.Left && x < b.rect.Right && y >= b.rect.Top && y < b.rect.Bottom {
@@ -196,7 +196,7 @@ func overlayProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	case win.WM_MOUSEMOVE:
 		x := int32(int16(lParam & 0xFFFF))
 		y := int32(int16((lParam >> 16) & 0xFFFF))
-		cmd := overlayAt(x, y)
+		cmd := overlayAt(s.m, x, y)
 		if cmd != s.overlayHover {
 			s.overlayHover = cmd
 			win.InvalidateRect(hwnd, nil, true)
@@ -220,7 +220,7 @@ func overlayProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	case win.WM_LBUTTONDOWN:
 		x := int32(int16(lParam & 0xFFFF))
 		y := int32(int16((lParam >> 16) & 0xFFFF))
-		if cmd := overlayAt(x, y); cmd != 0 {
+		if cmd := overlayAt(s.m, x, y); cmd != 0 {
 			s.command(cmd)
 		}
 		return 0

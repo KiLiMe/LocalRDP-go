@@ -11,6 +11,7 @@ import (
 
 var (
 	gdi32                    = syscall.NewLazyDLL("gdi32.dll")
+	shcore                   = syscall.NewLazyDLL("shcore.dll")
 	procGetCurrentProcessId  = kernel32.NewProc("GetCurrentProcessId")
 	procProcessIdToSessionId = kernel32.NewProc("ProcessIdToSessionId")
 	procGetEnvironmentVarW   = kernel32.NewProc("GetEnvironmentVariableW")
@@ -22,6 +23,9 @@ var (
 	procAdjustTokenPrivs     = advapi32.NewProc("AdjustTokenPrivileges")
 	procSystemParametersInfo = user32.NewProc("SystemParametersInfoW")
 	procGetDC                = user32.NewProc("GetDC")
+	procMonitorFromPoint     = user32.NewProc("MonitorFromPoint")
+	procGetDpiForMonitor     = shcore.NewProc("GetDpiForMonitor")
+	procGetDpiForSystem      = user32.NewProc("GetDpiForSystem")
 	procReleaseDC            = user32.NewProc("ReleaseDC")
 	procGetDeviceCaps        = gdi32.NewProc("GetDeviceCaps")
 	procShellExecuteExW      = shell32.NewProc("ShellExecuteExW")
@@ -318,4 +322,59 @@ func windowDPI(hwnd uintptr) uint32 {
 		return 96
 	}
 	return uint32(dpi)
+}
+
+// systemDPI is the dpi before there is a window to ask: the primary screen's.
+func systemDPI() uint32 {
+	if dpi, _, _ := procGetDpiForSystem.Call(); dpi != 0 {
+		return uint32(dpi)
+	}
+	dc, _, _ := procGetDC.Call(0)
+	if dc == 0 {
+		return 96
+	}
+	dpi, _, _ := procGetDeviceCaps.Call(dc, 88 /*LOGPIXELSX*/)
+	procReleaseDC.Call(0, dc)
+	if dpi == 0 {
+		return 96
+	}
+	return uint32(dpi)
+}
+
+// monitorDPI is the dpi of the screen the point is on, so a window that opens
+// on the second monitor gets that monitor's bar.
+func monitorDPI(x, y int32) uint32 {
+	pt := struct{ X, Y int32 }{x, y}
+	mon, _, _ := procMonitorFromPoint.Call(uintptr(unsafe.Pointer(&pt)), 2 /*MONITOR_DEFAULTTOPRIMARY*/)
+	if mon == 0 {
+		return systemDPI()
+	}
+	var dx, dy uint32
+	if hr, _, _ := procGetDpiForMonitor.Call(mon, 0, /*MDT_EFFECTIVE_DPI*/
+		uintptr(unsafe.Pointer(&dx)), uintptr(unsafe.Pointer(&dy))); hr != 0 || dx == 0 {
+		return systemDPI()
+	}
+	return dx
+}
+
+// dpiPx scales a size the user typed: the width and height in the form and on
+// the command line are what the desktop would be at 100%, so a 150% screen
+// gets 1.5 times as many pixels and the child desktop ends up as big as the
+// host's own windows instead of two thirds of them.
+func dpiPx(v int, dpi uint32) int {
+	if v <= 0 || dpi == 0 || dpi == 96 {
+		return v
+	}
+	return int((int64(v)*int64(dpi) + 48) / 96)
+}
+
+// startDPI is the dpi of the screen the window is about to open on: the one at
+// the requested corner, else the primary one, which is where an unplaced
+// window goes.
+func startDPI(opt *StartOptions) uint32 {
+	if opt != nil && opt.X != cwUseDefault && opt.Y != cwUseDefault {
+		return monitorDPI(int32(opt.X), int32(opt.Y))
+	}
+	wa := primaryWorkArea()
+	return monitorDPI((wa.Left+wa.Right)/2, (wa.Top+wa.Bottom)/2)
 }
