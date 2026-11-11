@@ -94,7 +94,6 @@ type hostState struct {
 	restoreExStyle   uint32
 	hasRestore       bool
 
-	launchPID   uint32
 	clipStarted bool
 	discDone    bool
 	discSeen    bool
@@ -479,7 +478,6 @@ func (s *hostState) onLaunchResult(kind, pid uintptr) uintptr {
 			}
 			return 0
 		}
-		s.launchPID = uint32(pid)
 		printOutf("Started program in child session pid=%d", pid)
 		logf("Started program in child session pid=%d", pid)
 	}
@@ -623,8 +621,8 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 			mmi.PtMaxTrackSize.Y = s.fixedH
 			return 0
 		}
-		mmi.PtMinTrackSize.X = 480
-		mmi.PtMinTrackSize.Y = 320
+		mmi.PtMinTrackSize.X = kMinDesktopW
+		mmi.PtMinTrackSize.Y = kMinDesktopH
 		return 0
 	case wmRdpDisconnected:
 		s.requestClose()
