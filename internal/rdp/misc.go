@@ -2,17 +2,22 @@ package rdp
 
 import (
 	"fmt"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/lxn/win"
+
+	"localrdp/internal/i18n"
+	"localrdp/internal/win32"
 )
 
 var (
 	procEnumWindows             = user32.NewProc("EnumWindows")
 	procGetWindowTextW          = user32.NewProc("GetWindowTextW")
 	procGetWindowTextLengthW    = user32.NewProc("GetWindowTextLengthW")
+	procSetWindowTextW          = user32.NewProc("SetWindowTextW")
 	procRemoveClipboardListener = user32.NewProc("RemoveClipboardFormatListener")
 	procCreateProcessAsUserW    = advapi32.NewProc("CreateProcessAsUserW")
 	userenv                     = syscall.NewLazyDLL("userenv.dll")
@@ -48,6 +53,22 @@ func loadAppIcon(inst win.HINSTANCE, size int32) win.HICON {
 	return win.HICON(win.LoadImage(inst, win.MAKEINTRESOURCE(appIconID), win.IMAGE_ICON, size, size, win.LR_DEFAULTCOLOR))
 }
 
+// hostIcons 返回会话窗口要挂的两个图标：大图标与小图标。会话版（右下角带点）
+// 取到就用它，取不到（PNG 解不开、DIB 建不成）退回 exe 资源里的那张。
+func hostIcons(inst win.HINSTANCE) (big, small win.HICON) {
+	bigSize := win.GetSystemMetrics(win.SM_CXICON)
+	smallSize := win.GetSystemMetrics(win.SM_CXSMICON)
+	big = sessionIcon(bigSize)
+	small = sessionIcon(smallSize)
+	if big == 0 {
+		big = loadAppIcon(inst, bigSize)
+	}
+	if small == 0 {
+		small = loadAppIcon(inst, smallSize)
+	}
+	return big, small
+}
+
 func windowText(hwnd uintptr) string {
 	n, _, _ := procGetWindowTextLengthW.Call(hwnd)
 	if int32(n) <= 0 {
@@ -56,4 +77,26 @@ func windowText(hwnd uintptr) string {
 	buf := make([]uint16, int(n)+1)
 	procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
 	return syscall.UTF16ToString(buf)
+}
+
+// setWindowText 换窗口标题；任务栏标签与 tooltip 跟着它变。
+func setWindowText(hwnd uintptr, title string) {
+	p, err := syscall.UTF16PtrFromString(title)
+	if err != nil {
+		return
+	}
+	procSetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(p)))
+}
+
+// sessionTitle 是会话窗口的标题：用户给的 title 后面挂上子会话号，任务栏上
+// 两个按钮才分得出哪个是主窗口、哪个是会话窗口。
+func sessionTitle(base string, sid uint32) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "LocalRDP"
+	}
+	if sid == 0 {
+		return base
+	}
+	return base + " · " + i18n.T("Child session") + " " + win32.Itoa(int(sid))
 }

@@ -383,6 +383,9 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		s.loggedIn = true
 		s.invalidateBar()
 		sid := getChildSessionID()
+		// 标题挂上会话号：任务栏上两个按钮一个叫 LocalRDP，一个叫
+		// “LocalRDP · 子会话 48”，不给号就分不出哪个是哪个。
+		setWindowText(uintptr(s.hwnd), sessionTitle(s.opt.Title, sid))
 		printOutf("Logon complete. Child session id=%d", sid)
 		logf("Logon complete. Child session id=%d", sid)
 		if s.opt.Clipboard {
@@ -911,8 +914,7 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	s.resizable = style&win.WS_THICKFRAME != 0
 
 	inst := win.GetModuleHandle(nil)
-	appIcon := loadAppIcon(inst, win.GetSystemMetrics(win.SM_CXICON))
-	appIconSm := loadAppIcon(inst, win.GetSystemMetrics(win.SM_CXSMICON))
+	appIcon, appIconSm := hostIcons(inst)
 	wc := win.WNDCLASSEX{
 		CbSize:        uint32(unsafe.Sizeof(win.WNDCLASSEX{})),
 		Style:         win.CS_HREDRAW | win.CS_VREDRAW,
