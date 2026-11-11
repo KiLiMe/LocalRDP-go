@@ -51,4 +51,10 @@ rsrc_windows_amd64.syso  exe 的图标与版本信息（go build 自动链入）
 ```pwsh
 pwsh .\build.ps1 -Test      # go vet + go test + 编译到 build\bin\Release\localrdp.exe
 go vet ./... ; gofmt -l .   # CI 同款检查，gofmt 有输出即失败
+$env:LRDP_LIVE = '1'; go test ./internal/rdp -run Live -v   # 真开窗口的那层，见下
 ```
+
+测试分两层：默认的 `go test` 只跑纯函数（不建窗口、不连会话，CI 就靠这一层）；
+`*_live_windows_test.go` 里的 `TestLive…` 会真的起一个子会话、量窗口矩形再注销，
+所以只有设了 `LRDP_LIVE=1` 才跑。跑之前先关掉自己的窗口（有一个会话窗口开着时它们会跳过），
+注销偶尔要几十秒，是会话在收尾，不是卡死。
