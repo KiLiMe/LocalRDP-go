@@ -27,7 +27,10 @@ const (
 	kTimerOverlay = 8
 
 	wmRdpDisconnected = win.WM_APP + 1
-	className         = "LocalRDP.Host"
+	// wmRdpLaunched reports a launch that had to happen off the UI thread:
+	// wParam says which one, lParam is the pid (0 when it failed).
+	wmRdpLaunched = win.WM_APP + 3
+	className     = "LocalRDP.Host"
 
 	// hotkeyFullScreen is the id of the Ctrl+Alt+F hot key this window claims.
 	hotkeyFullScreen = 1
@@ -435,6 +438,54 @@ func (s *hostState) onEvent(id int32, args []variant) {
 	}
 }
 
+// Which launch wmRdpLaunched is reporting on.
+const (
+	launchClipBridge   = 1
+	launchSessionEntry = 2
+)
+
+// launchAsync runs a launch off the UI thread. launchInSession retries for
+// seconds while the child session is not ready, and the window has to keep
+// following the mouse meanwhile; the outcome comes back as wmRdpLaunched.
+func (s *hostState) launchAsync(kind uintptr, sid uint32, cmd string) {
+	hwnd := s.hwnd
+	go func() {
+		var pid uint32
+		ok := launchInSession(sid, cmd, "", true, &pid)
+		var lp uintptr
+		if ok {
+			lp = uintptr(pid)
+		}
+		win.PostMessage(hwnd, wmRdpLaunched, kind, lp)
+	}()
+}
+
+// onLaunchResult runs on the UI thread, so everything it touches is ours.
+func (s *hostState) onLaunchResult(kind, pid uintptr) uintptr {
+	switch kind {
+	case launchClipBridge:
+		if pid == 0 {
+			s.warn(fault.ClipBridgeFailed, "")
+			return 0
+		}
+		s.clipStarted = true
+		logf("Clipboard bridge started in child session pid=%d", pid)
+	case launchSessionEntry:
+		if pid == 0 {
+			logError("Failed to start the session entry process in the child session.")
+			if !s.opt.Desktop {
+				s.fail(fault.LaunchFailed, "")
+				s.requestClose()
+			}
+			return 0
+		}
+		s.launchPID = uint32(pid)
+		printOutf("Started program in child session pid=%d", pid)
+		logf("Started program in child session pid=%d", pid)
+	}
+	return 0
+}
+
 func (s *hostState) startClipBridge() {
 	sid := getChildSessionID()
 	if sid == kNoSession {
@@ -442,13 +493,7 @@ func (s *hostState) startClipBridge() {
 	}
 	cmd := buildCommandLine([]string{win32.ExePath(), "--clip-bridge",
 		"--expect-session", win32.Itoa(int(sid)), "--parent-pid", win32.Itoa(int(currentProcessID()))})
-	var pid uint32
-	if !launchInSession(sid, cmd, "", true, &pid) {
-		s.warn(fault.ClipBridgeFailed, "")
-		return
-	}
-	s.clipStarted = true
-	logf("Clipboard bridge started in child session pid=%d", pid)
+	s.launchAsync(launchClipBridge, sid, cmd)
 }
 
 func (s *hostState) startSessionEntry() {
@@ -463,18 +508,7 @@ func (s *hostState) startSessionEntry() {
 	}
 	cmd := buildCommandLine([]string{win32.ExePath(), "--session-entry",
 		"--job", s.jobPath, "--expect-session", win32.Itoa(int(sid))})
-	var pid uint32
-	if !launchInSession(sid, cmd, "", true, &pid) {
-		logError("Failed to start the session entry process in the child session.")
-		if !s.opt.Desktop {
-			s.fail(fault.LaunchFailed, "")
-			s.requestClose()
-		}
-		return
-	}
-	s.launchPID = pid
-	printOutf("Started program in child session pid=%d", pid)
-	logf("Started program in child session pid=%d", pid)
+	s.launchAsync(launchSessionEntry, sid, cmd)
 }
 
 func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
@@ -595,6 +629,8 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	case wmRdpDisconnected:
 		s.requestClose()
 		return 0
+	case wmRdpLaunched:
+		return s.onLaunchResult(wParam, lParam)
 	case win.WM_HOTKEY:
 		if int(wParam) == hotkeyFullScreen {
 			s.toggleFullscreen()
