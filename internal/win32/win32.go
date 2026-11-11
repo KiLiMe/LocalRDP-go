@@ -4,6 +4,7 @@
 package win32
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,10 +47,30 @@ var (
 	procSetStdHandle             = kernel32.NewProc("SetStdHandle")
 	procCreateMutexW             = kernel32.NewProc("CreateMutexW")
 	procCloseHandle              = kernel32.NewProc("CloseHandle")
+	shell32                      = syscall.NewLazyDLL("shell32.dll")
+	procSetProcessAppUserModelID = shell32.NewProc("SetCurrentProcessExplicitAppUserModelID")
 )
 
 // swRestore is ShowWindow's SW_RESTORE.
 const swRestore = 9
+
+// SetAppUserModelID puts this process into the taskbar group named id. The
+// taskbar groups windows by app user model ID; a process that sets none is
+// grouped by its exe path, so two windows of the same exe (this program's form
+// and its child desktop) share one button until one of them asks for an ID of
+// its own. Call it before the first window is created: the button is made with
+// the ID that is current at that moment. An empty id means no explicit group
+// (Windows goes back to grouping by exe path).
+func SetAppUserModelID(id string) error {
+	p, err := syscall.UTF16PtrFromString(id)
+	if err != nil {
+		return err
+	}
+	if hr, _, _ := procSetProcessAppUserModelID.Call(uintptr(unsafe.Pointer(p))); hr != 0 {
+		return fmt.Errorf("SetCurrentProcessExplicitAppUserModelID(%q) failed: HRESULT 0x%08x", id, uint32(hr))
+	}
+	return nil
+}
 
 // FreeConsole drops the console this process was given, so a window that is
 // started by double clicking does not come with a black console behind it.

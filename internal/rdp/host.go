@@ -835,7 +835,18 @@ func pickLanguage() {
 	i18n.Set(lang)
 }
 
+// sessionAppID is the taskbar group of the child desktop window. A process
+// that names no group is grouped by its exe path, and the form is that same
+// exe — so without an ID of its own the child desktop would land on the form's
+// button, with the form's icon and preview. Its own group gives it its own
+// button, so the two windows can be found, switched to and closed apart.
+const sessionAppID = "com.localrdp.desktop.session"
+
 func RunRdpSession(opt StartOptions, jobPath string) int {
+	if err := win32.SetAppUserModelID(sessionAppID); err != nil {
+		// 没有自己的任务栏分组也能跑，只是窗口会并到主窗口那个按钮上。
+		logWarn("设置任务栏分组失败: " + err.Error())
+	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
