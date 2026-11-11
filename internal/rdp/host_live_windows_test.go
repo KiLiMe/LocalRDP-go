@@ -6,7 +6,7 @@ package rdp
 //
 //	$env:LRDP_LIVE = '1'; go test ./internal/rdp -run Live -v
 //
-// LRDP_LIVE_EXE 可以指到现成的 build\bin\Release\localrdp.exe，省掉每次编译。
+// LRDP_LIVE_EXE 可以指到现成的 build\windows-amd64\localrdp.exe，省掉每次编译。
 
 import (
 	"context"

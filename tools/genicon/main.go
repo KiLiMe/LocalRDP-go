@@ -1,19 +1,17 @@
-//go:build ignore
-
 // genicon draws the icon of the window — the folder with the plus, in the
-// accent color — at every size an .ico wants, and writes winres/localrdp.ico.
+// accent color — and writes winres/localrdp.png, the picture `mygo build`
+// bakes into the exe: mygo scales that PNG down to every size a Windows icon
+// holds (cmd/mygo/icon.go in github.com/egoist/mygo).
 //
-//	go run tools/genicon/main.go
+//	go run ./tools/genicon
 //
-// go-winres turns that file into the resource object the linker embeds:
-//
-//	go-winres simply --icon winres/localrdp.ico --manifest none \
-//	    --product-name LocalRDP --file-version 2026.11.7.1 --product-version 2026.11.7.1
+// The PNG is committed, and main_test.go fails when it no longer matches what
+// draw renders: change the drawing, rerun the command above. No build tag
+// hides the file, so that test can draw through the same code.
 package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"flag"
 	"image"
 	"image/color"
@@ -21,13 +19,16 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 )
 
 // The view box the paths are drawn in, so they match internal/ui/icons.go.
 const box = 24.0
 
-// The sizes an .ico holds: the ones Windows asks for, small to large.
-var sizes = []int{16, 20, 24, 32, 40, 48, 64, 128, 256}
+// iconSize is the edge of the PNG, in pixels: 256 is the biggest size of a
+// Windows icon, so mygo passes it through untouched and averages down from it
+// for the smaller ones.
+const iconSize = 256
 
 // The colors of the icon: the window's accent behind, white on it.
 var (
@@ -38,47 +39,20 @@ var (
 type pt struct{ x, y float64 }
 
 func main() {
-	out := flag.String("o", "winres/localrdp.ico", "the .ico to write")
+	out := flag.String("o", "winres/localrdp.png", "the PNG to write")
 	flag.Parse()
 
-	var ico bytes.Buffer
-	ico.Write(make([]byte, 6)) // the header, filled in once the images are known
-	binary.LittleEndian.PutUint16(ico.Bytes()[2:], 1)
-	binary.LittleEndian.PutUint16(ico.Bytes()[4:], uint16(len(sizes)))
-
-	blobs := make([][]byte, 0, len(sizes))
-	for _, n := range sizes {
-		var pngs bytes.Buffer
-		if err := png.Encode(&pngs, draw(n)); err != nil {
-			log.Fatalf("encode %d: %v", n, err)
-		}
-		blobs = append(blobs, pngs.Bytes())
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, draw(iconSize)); err != nil {
+		log.Fatalf("encode %dx%d: %v", iconSize, iconSize, err)
 	}
-
-	offset := 6 + 16*len(sizes)
-	for i, n := range sizes {
-		entry := make([]byte, 16)
-		if n < 256 {
-			entry[0], entry[1] = byte(n), byte(n)
-		}
-		binary.LittleEndian.PutUint16(entry[4:], 1)  // planes
-		binary.LittleEndian.PutUint16(entry[6:], 32) // bits per pixel
-		binary.LittleEndian.PutUint32(entry[8:], uint32(len(blobs[i])))
-		binary.LittleEndian.PutUint32(entry[12:], uint32(offset))
-		ico.Write(entry)
-		offset += len(blobs[i])
-	}
-	for _, b := range blobs {
-		ico.Write(b)
-	}
-
-	if err := os.MkdirAll("winres", 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.WriteFile(*out, ico.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(*out, buf.Bytes(), 0o644); err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("wrote %s: %d sizes, %d bytes", *out, len(sizes), ico.Len())
+	log.Printf("wrote %s: %dx%d, %d bytes", *out, iconSize, iconSize, buf.Len())
 }
 
 // draw renders the icon at n pixels a side, antialiased by sampling each

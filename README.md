@@ -4,7 +4,8 @@
 通过非公开属性 `ConnectToChildSession` 直接连进 child session，得到一个**带 Explorer 的
 完整第二桌面**，可以和当前桌面用 Alt+Tab 互相切换。
 
-- 纯 Go，无 MSVC / CMake / ATL 依赖，`go build` 产出单文件 exe（约 10 MB）
+- 纯 Go，无 MSVC / CMake / ATL 依赖，打包出一个单文件 exe（约 10 MB，带图标与版本信息）
+- 发布物是 `build\localrdp-<版本>-windows-amd64.zip`（exe + LICENSE）
 - ActiveX 宿主、事件 sink、DISPATCH 封装全部自写
 - 只有 `desktop` 需要零特权；`start -- 程序` 需要一次性授予两个账户特权
 
@@ -14,14 +15,14 @@
 ## 快速开始
 
 ```pwsh
-go build -trimpath -ldflags '-s -w -H=windowsgui' -o build\bin\Release\localrdp.exe .
-.\build\bin\Release\localrdp.exe          # 图形界面（推荐）
-.\build\bin\Release\localrdp.exe status
-.\build\bin\Release\localrdp.exe desktop --user "$env:USERDOMAIN\$env:USERNAME" --password-env LRDP_PW
-.\build\bin\Release\localrdp.exe stop
+pwsh .\build.ps1                            # 打包到 build\windows-amd64\，并在 build\ 压成 zip
+.\build\windows-amd64\localrdp.exe          # 图形界面（推荐）
+.\build\windows-amd64\localrdp.exe status
+.\build\windows-amd64\localrdp.exe desktop --user "$env:USERDOMAIN\$env:USERNAME" --password-env LRDP_PW
+.\build\windows-amd64\localrdp.exe stop
 ```
 
-`-H=windowsgui` 让 exe 成为图形子系统程序：双击不会有黑框控制台。从终端调用时程序自己
+`-H=windowsgui`（mygo 打包时自动加）让 exe 成为图形子系统程序：双击不会有黑框控制台。从终端调用时程序自己
 `AttachConsole` 到父终端，`status` 的输出照常看得见；被重定向到管道或文件时用继承来的句柄，
 `| Out-File`、`$out = & localrdp.exe status` 也照常工作。
 

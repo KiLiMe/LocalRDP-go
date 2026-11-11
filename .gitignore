@@ -5,6 +5,9 @@
 *.dll
 *.pdb
 
+# mygo build 往主包里临时写的资源对象（自己会删，崩溃时才会留下）
+mygo_windows_*.syso
+
 # 临时
 tmp_*/
 *.log

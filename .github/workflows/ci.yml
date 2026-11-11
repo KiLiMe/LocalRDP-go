@@ -40,4 +40,16 @@ jobs:
         run: go test ./...
 
       - name: Build
-        run: go build -trimpath -ldflags '-s -w -H=windowsgui' -o build/bin/Release/localrdp.exe .
+        run: go tool mygo build -platform windows/amd64 -skip-installer -skip-dmg
+
+      - name: Check the exe
+        shell: pwsh
+        run: |
+          $exe = 'build/windows-amd64/localrdp.exe'
+          if (-not (Test-Path $exe)) { throw "mygo build produced no $exe" }
+          $want = (Get-Content mygo.json -Raw | ConvertFrom-Json).version
+          $got = (Get-Item $exe).VersionInfo.FileVersion
+          if ($got -ne $want) { throw "exe says $got, mygo.json says $want" }
+          # 图形子系统程序的 $LASTEXITCODE 不稳，用 Start-Process 等它退并拿 ExitCode。
+          $p = Start-Process -FilePath $exe -ArgumentList 'help' -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "$exe help exited $($p.ExitCode)" }

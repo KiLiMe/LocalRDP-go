@@ -32,7 +32,7 @@ func enumWindows(cb uintptr, lparam uintptr) {
 	procEnumWindows.Call(cb, lparam)
 }
 
-// exe 里的图标资源：go-winres 生成的 rsrc_windows_amd64.syso，图标组号是 1。
+// exe 里的图标资源：mygo 打包时写进 exe 的图标组，组号是 1（它自己分组的顺序）。
 // 没有它，任务栏缩略图、Alt+Tab 只能画一个通用的空壳图标。
 const (
 	appIconID = 1

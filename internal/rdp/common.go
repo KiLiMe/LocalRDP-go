@@ -10,8 +10,9 @@ import (
 )
 
 // versionString is what the command line prints and what the MCP server calls
-// itself; build.ps1 -Version rewrites it at link time.
-var versionString = "1.0.0"
+// itself; build.ps1 rewrites it at link time from mygo.json's version, so a
+// bare `go build` reports "dev" rather than a version it does not have.
+var versionString = "dev"
 
 const (
 	kNoSession   = 0xFFFFFFFF

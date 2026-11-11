@@ -1,0 +1,12 @@
+{
+  "name": "localrdp",
+  "identifier": "com.localrdp.desktop",
+  "version": "2026.11.11.1",
+  "publisher": "LocalRDP",
+  "copyright": "(c) 2026 LocalRDP",
+  "main": ".",
+  "out": "build",
+  "icon": "winres/localrdp.png",
+  "resources": ["LICENSE"],
+  "windows": { "displayName": "LocalRDP" }
+}
