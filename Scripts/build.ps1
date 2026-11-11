@@ -1,12 +1,12 @@
 #Requires -Version 7.0
 <#
   LocalRDP 构建脚本
-    pwsh .\build.ps1            -> 打包到 build\windows-amd64\localrdp.exe，
-                                   并压成 build\localrdp-<版本>-windows-amd64.zip
-    pwsh .\build.ps1 -Clean     -> 先删 build 目录再打包
-    pwsh .\build.ps1 -Test      -> 打包前先跑 go vet 与 go test
-    pwsh .\build.ps1 -Version 2026.11.11.1
-                                -> 断言模式：mygo.json 里的版本必须是这一串（发版时对 tag 用）
+    pwsh .\Scripts\build.ps1                   -> 打包到 build\windows-amd64\localrdp.exe，
+                                                  并压成 build\localrdp-<版本>-windows-amd64.zip
+    pwsh .\Scripts\build.ps1 -Clean            -> 先删 build 目录再打包
+    pwsh .\Scripts\build.ps1 -Test             -> 打包前先跑 go vet 与 go test
+    pwsh .\Scripts\build.ps1 -Version 2026.11.11.1
+                                               -> 断言模式：mygo.json 里的版本必须是这一串（发版时对 tag 用）
 
   版本号只有一个来源：mygo.json 的 version。它被两处读走——mygo build 写进
   exe 的版本信息，本脚本经 -X 写进程序（`localrdp status` 与 MCP 的 server version）。
@@ -21,7 +21,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Root     = $PSScriptRoot
+$Root     = Split-Path -Parent $PSScriptRoot   # 脚本在 Scripts\，仓库根在上一层
 $Config   = Join-Path $Root 'mygo.json'
 $BuildDir = Join-Path $Root 'build'
 $OutDir   = Join-Path $BuildDir 'windows-amd64'

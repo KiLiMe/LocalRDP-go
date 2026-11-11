@@ -27,7 +27,7 @@ internal/rdp/            命令行 + RDP 宿主（COM 容器、会话启动、�
 internal/app/  ui/       窗口逻辑 / 只读 State 的绘制
 internal/store/ i18n/    设置与 DPAPI 密码 / 中英文案
 internal/win32/ mcp/     Win32 小工具 / MCP 协议层
-build.ps1                构建：mygo 打包 + -X 注入 + zip 发布
+Scripts/build.ps1         构建：mygo 打包 + -X 注入 + zip 发布
 mygo.json                exe 的名字、版本、图标、产物目录（mygo 的打包配置）
 ```
 
@@ -40,7 +40,7 @@ mygo.json                exe 的名字、版本、图标、产物目录（mygo �
 > 始终以干净、模块化的方式写代码，架构合理、职责分离。不要因为是我提的需求就硬塞功能。如果找不到自然的方式实现，且你认为该重构才能让整体更干净，那就提前停下来说明。
 
 - 新增依赖前先确认依赖方向没被打穿，分层见上面「目录」一节。
-- 版本号只认 `mygo.json` 的 `version`：改版本只改这一处，`pwsh .\build.ps1` 会经 `MYGO_LDFLAGS`
+- 版本号只认 `mygo.json` 的 `version`：改版本只改这一处，`pwsh .\Scripts\build.ps1` 会经 `MYGO_LDFLAGS`
   把同一个数字注入程序，并从 exe 属性里读回来对账。图标与版本信息由 `go tool mygo build`
   从 `winres/localrdp.png` 与 `mygo.json` 注入，仓库里没有 `.syso`，也**不要**手工塞一个进去
   （有非 mygo 的 `.syso` 时 mygo 会让位给它，图标与版本就不会被注入了）。
@@ -51,8 +51,8 @@ mygo.json                exe 的名字、版本、图标、产物目录（mygo �
 ## 构建与验证
 
 ```pwsh
-pwsh .\build.ps1 -Test      # go vet + go test + 打包到 build\windows-amd64\localrdp.exe 与 zip
-go vet ./... ; gofmt -l .   # CI 同款检查，gofmt 有输出即失败
+pwsh .\Scripts\build.ps1 -Test      # go vet + go test + 打包到 build\windows-amd64\localrdp.exe 与 zip
+go vet ./... ; gofmt -l .           # CI 同款检查，gofmt 有输出即失败
 $env:LRDP_LIVE = '1'; go test ./internal/rdp -run Live -v   # 真开窗口的那层，见下
 ```
 
