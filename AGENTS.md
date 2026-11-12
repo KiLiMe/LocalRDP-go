@@ -45,7 +45,7 @@ mygo.json                exe 的名字、版本、图标、产物目录（mygo �
 - 界面文案只写在 `locales/en.json` 与 `locales/zh-Hans.json` 里，改完跑 `go tool mygo generate`
   重新生成 `locales/catalog_gen.go`（生成物，别手改），代码里调 `locales.Settings()` 这样的
   accessor：拿英文当 key 查表的写法已经被这一层替掉了。
-- 版本号只认 `mygo.json` 的 `version`：改版本只改这一处，`pwsh .\Scripts\build.ps1` 会经 `MYGO_LDFLAGS`
+- 版本号是 SemVer（`主.次.修`，如 `1.4.2`），只认 `mygo.json` 的 `version`：改版本只改这一处，`pwsh .\Scripts\build.ps1` 会经 `MYGO_LDFLAGS`
   把同一个数字注入程序，并从 exe 属性里读回来对账。图标与版本信息由 `go tool mygo build`
   从 `winres/localrdp.png` 与 `mygo.json` 注入，仓库里没有 `.syso`，也**不要**手工塞一个进去
   （有非 mygo 的 `.syso` 时 mygo 会让位给它，图标与版本就不会被注入了）。

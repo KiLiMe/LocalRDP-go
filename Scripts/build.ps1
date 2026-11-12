@@ -38,9 +38,18 @@ if (-not (Test-Path -LiteralPath $Config)) {
 
 # 版本：mygo.json 是唯一来源，-Version 只是断言。
 $target = [string](Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json).version
-if ($target -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-    Write-Host "  [ERR] mygo.json 的 version 要是四段数字（tag 去掉 v）：'$target'。" -ForegroundColor Red
+# SemVer 2.0.0：主.次.修，可选 -预发布 与 +构建；数字段不许前导零。
+if ($target -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
+    Write-Host "  [ERR] mygo.json 的 version 要是语义化版本（主.次.修，如 1.4.2；tag 去掉 v）：'$target'。" -ForegroundColor Red
     exit 1
+}
+# exe 的版本资源是 4 个 uint16，超了会静默回绕。
+$numeric = (($target -split '-')[0] -split '\+')[0]
+foreach ($part in $numeric.Split('.')) {
+    if ([int]$part -gt 65535) {
+        Write-Host "  [ERR] 版本号的每一段最多 65535（Windows 版本资源的上限）：'$target'。" -ForegroundColor Red
+        exit 1
+    }
 }
 if ($Version -and $Version -ne $target) {
     Write-Host "  [ERR] 版本对不上：-Version 是 $Version，mygo.json 里是 '$target'。" -ForegroundColor Red
