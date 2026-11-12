@@ -15,7 +15,7 @@
 ## 快速开始
 
 ```pwsh
-pwsh .\Scripts\build.ps1                     # 打包到 build\windows-amd64\，并在 build\ 压成 zip
+pwsh .\Scripts\build.ps1                     # 打包到 build\windows-amd64\；发版带 -Version 时才压 zip
 .\build\windows-amd64\localrdp.exe          # 图形界面（推荐）
 .\build\windows-amd64\localrdp.exe status
 .\build\windows-amd64\localrdp.exe desktop --user "$env:USERDOMAIN\$env:USERNAME" --password-env LRDP_PW

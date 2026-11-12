@@ -1,12 +1,12 @@
 #Requires -Version 7.0
 <#
   LocalRDP 构建脚本
-    pwsh .\Scripts\build.ps1                   -> 打包到 build\windows-amd64\localrdp.exe，
-                                                  并压成 build\localrdp-<版本>-windows-amd64.zip
+    pwsh .\Scripts\build.ps1                   -> 打包到 build\windows-amd64\localrdp.exe（本地构建不出 zip）
     pwsh .\Scripts\build.ps1 -Clean            -> 先删 build 目录再打包
     pwsh .\Scripts\build.ps1 -Test             -> 打包前先跑 go vet 与 go test
     pwsh .\Scripts\build.ps1 -Version 2026.11.11.1
-                                               -> 断言模式：mygo.json 里的版本必须是这一串（发版时对 tag 用）
+                                               -> 发版模式：mygo.json 里的版本必须是这一串（发版时对 tag 用），
+                                                  并压成 build\localrdp-<版本>-windows-amd64.zip
 
   版本号只有一个来源：mygo.json 的 version。它被两处读走——mygo build 写进
   exe 的版本信息，本脚本经 -X 写进程序（`localrdp status` 与 MCP 的 server version）。
@@ -102,11 +102,15 @@ if ($fileVersion -ne $target) {
     exit 1
 }
 
-$Zip = Join-Path $BuildDir "localrdp-$target-windows-amd64.zip"
-if (Test-Path -LiteralPath $Zip) { Remove-Item -LiteralPath $Zip -Force }
-Compress-Archive -Path (Join-Path $OutDir '*') -DestinationPath $Zip -CompressionLevel Optimal
-
 $size = [math]::Round((Get-Item -LiteralPath $Exe).Length / 1MB, 2)
-$zsize = [math]::Round((Get-Item -LiteralPath $Zip).Length / 1MB, 2)
 Write-Host "  [OK] $Exe v$target ($size MB)" -ForegroundColor Green
-Write-Host "  [OK] $Zip ($zsize MB)" -ForegroundColor Green
+
+# zip 只有发版才出：带 -Version 的调用（CI 的 release job）走这一条；
+# 本地构建只留 exe，省一次压缩。
+if ($Version) {
+    $Zip = Join-Path $BuildDir "localrdp-$target-windows-amd64.zip"
+    if (Test-Path -LiteralPath $Zip) { Remove-Item -LiteralPath $Zip -Force }
+    Compress-Archive -Path (Join-Path $OutDir '*') -DestinationPath $Zip -CompressionLevel Optimal
+    $zsize = [math]::Round((Get-Item -LiteralPath $Zip).Length / 1MB, 2)
+    Write-Host "  [OK] $Zip ($zsize MB)" -ForegroundColor Green
+}

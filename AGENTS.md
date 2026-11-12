@@ -29,7 +29,7 @@ internal/store/          设置与 DPAPI 密码
 internal/i18n/           语言选择：中文还是英文
 internal/win32/ mcp/     Win32 小工具 / MCP 协议层
 locales/                 消息：en.json 源 + zh-Hans.json 中文，catalog_gen.go 是生成的
-Scripts/build.ps1         构建：mygo 打包 + -X 注入 + zip 发布
+Scripts/build.ps1         构建：mygo 打包 + -X 注入；带 -Version 的发版路径多压一个 zip
 mygo.json                exe 的名字、版本、图标、产物目录（mygo 的打包配置）
 ```
 
@@ -56,7 +56,7 @@ mygo.json                exe 的名字、版本、图标、产物目录（mygo �
 ## 构建与验证
 
 ```pwsh
-pwsh .\Scripts\build.ps1 -Test      # go vet + go test + 打包到 build\windows-amd64\localrdp.exe 与 zip
+pwsh .\Scripts\build.ps1 -Test      # go vet + go test + 打包到 build\windows-amd64\localrdp.exe（发版才带 -Version，多一个 zip）
 go vet ./... ; gofmt -l .           # CI 同款检查，gofmt 有输出即失败
 $env:LRDP_LIVE = '1'; go test ./internal/rdp -run Live -v   # 真开窗口的那层，见下
 ```
