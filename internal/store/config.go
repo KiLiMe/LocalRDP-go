@@ -42,6 +42,11 @@ type Session struct {
 	// Scale is the desktop scale of the child session, 100 to 500; 0 asks
 	// for 100, the window's own pixels, and only SizeScale reads it.
 	Scale int `json:"scale,omitempty"`
+	// NoScaleInherit keeps the child session at 100% when Scale is 0, even
+	// on a screen whose own scaling is not 100%: the session's text then
+	// stays the size it would have on a 100% screen instead of growing with
+	// the host's.
+	NoScaleInherit bool `json:"no_scale_inherit,omitempty"`
 	// Title of the host window; empty for the default.
 	Title string `json:"title,omitempty"`
 	// FullScreen, Hidden and Minimized are the window's first state.
@@ -144,6 +149,9 @@ func (s Session) Args() []string {
 	}
 	if s.Scale > 0 {
 		args = append(args, "--scale", fmt.Sprint(s.Scale))
+	}
+	if s.NoScaleInherit {
+		args = append(args, "--no-scale-inherit")
 	}
 	if s.Timeout > 0 {
 		args = append(args, "--timeout", fmt.Sprint(s.Timeout))

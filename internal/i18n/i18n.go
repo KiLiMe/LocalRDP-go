@@ -55,6 +55,8 @@ var zh = map[string]string{
 	"Full screen":               "全屏",
 	"Keep session":              "保留会话",
 	"Minimized":                 "最小化",
+	"No inherited scaling":      "禁用缩放自动继承",
+	"No inherited scaling hint": "缩放留空时子会话跟着屏幕的缩放（150% 等）排版；勾上则固定按 100%。",
 	"Timeout":                   "超时",
 	"Second":                    "秒",
 	"Open child session":        "打开子会话",

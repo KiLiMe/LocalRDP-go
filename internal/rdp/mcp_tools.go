@@ -312,16 +312,17 @@ func mcpTools() []mcp.Tool {
 			Title:       "Open the child desktop",
 			Description: "Start `localrdp desktop` detached: a host window showing the child session of this account. Returns the new pid. Use lrdp_log and lrdp_diag afterwards to watch the connection.",
 			Schema: mcp.ObjectSchema(map[string]any{
-				"user":         mcp.Prop("string", "account name for the child session (default: current user)"),
-				"password":     mcp.Prop("string", "password; passed to the child through an environment variable, never argv"),
-				"password_env": mcp.Prop("string", "name of an environment variable holding the password"),
-				"width":        mcp.Prop("integer", "window client width"),
-				"height":       mcp.Prop("integer", "window client height"),
-				"size":         mcp.Prop("string", "fit, fixed or scale (the UI calls it stretch): what the window does with the session desktop (see docs/使用说明.md 5.2)"),
-				"scale":        mcp.Prop("integer", "desktop scale percent 100-500 (default: none, i.e. 100)"),
-				"fullscreen":   mcp.Prop("boolean", "open full screen"),
-				"title":        mcp.Prop("string", "host window title"),
-				"timeout":      mcp.Prop("integer", "connect timeout in seconds"),
+				"user":             mcp.Prop("string", "account name for the child session (default: current user)"),
+				"password":         mcp.Prop("string", "password; passed to the child through an environment variable, never argv"),
+				"password_env":     mcp.Prop("string", "name of an environment variable holding the password"),
+				"width":            mcp.Prop("integer", "window client width"),
+				"height":           mcp.Prop("integer", "window client height"),
+				"size":             mcp.Prop("string", "fit, fixed or scale (the UI calls it stretch): what the window does with the session desktop (see docs/使用说明.md 5.2)"),
+				"scale":            mcp.Prop("integer", "desktop scale percent 100-500 (default: none, i.e. 100)"),
+				"no_scale_inherit": mcp.Prop("boolean", "with no scale, keep the child session at 100% instead of following the screen's scaling (see docs/使用说明.md 5.2)"),
+				"fullscreen":       mcp.Prop("boolean", "open full screen"),
+				"title":            mcp.Prop("string", "host window title"),
+				"timeout":          mcp.Prop("integer", "connect timeout in seconds"),
 			}, nil, false),
 			Run: func(args map[string]any) (string, error) {
 				return mcpLaunch(args, false)
@@ -434,6 +435,9 @@ func mcpLaunch(args map[string]any, start bool) (string, error) {
 	}
 	if v := mcp.ArgInt(args, "scale", 0, 0, 500); v > 0 {
 		cmd = append(cmd, "--scale", win32.Itoa(v))
+	}
+	if mcp.ArgBool(args, "no_scale_inherit") {
+		cmd = append(cmd, "--no-scale-inherit")
 	}
 	if t := mcp.ArgString(args, "title", ""); t != "" {
 		cmd = append(cmd, "--title", t)

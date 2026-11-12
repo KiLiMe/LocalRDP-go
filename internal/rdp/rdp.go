@@ -274,6 +274,25 @@ func resolveScale(_ win.HWND, opt *StartOptions) (int32, int32) {
 	return pct, deviceScaleFor(pct)
 }
 
+// guestDPI is the dpi the session's desktop is told it has, from the dpi its
+// window is on. That number goes into the physical size
+// UpdateSessionDisplaySettings reports, and the guest lays out at the dpi it
+// implies: on a 150% screen the child session is a 150% session, the same as
+// the host's own windows.
+//
+// --no-scale-inherit says no, when no --scale was given: the session stays at
+// 96 dpi whatever the screen is, so its text keeps the size it would have on a
+// 100% screen instead of growing with the host's scaling.
+func guestDPI(opt *StartOptions, dpi uint32) uint32 {
+	if opt != nil && opt.NoScaleInherit && opt.Scale <= 0 {
+		return 96
+	}
+	if dpi == 0 {
+		return 96
+	}
+	return dpi
+}
+
 // deviceScaleFor maps a desktop scale factor onto the device scale factor the
 // session reports back to the guest.
 func deviceScaleFor(pct int32) int32 {

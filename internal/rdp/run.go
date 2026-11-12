@@ -31,6 +31,7 @@ func printHelp() {
 	printOut("  --height N         Initial window client height (same work-area limit)")
 	printOut("  --x N --y N        Host window position")
 	printOut("  --scale N          Desktop scale percent 100-500 (default: 100, the window's own pixels)")
+	printOut("  --no-scale-inherit With no --scale, keep the child session at 100%: the screen's own\n                     scaling (150% and so) is not handed to it")
 	printOut("  --size MODE        fit (default, window decides the resolution), fixed (window and")
 	printOut("                     session keep --width/--height, no resize border), or scale (the")
 	printOut("                     resolution stays; a smaller window shrinks the picture to fit, a")
@@ -245,6 +246,12 @@ func Run(args []string) int {
 			if opt.Scale > 500 {
 				opt.Scale = 500
 			}
+			continue
+		case "--no-scale-inherit":
+			if !optionsAllowed {
+				return int(ExitError)
+			}
+			opt.NoScaleInherit = true
 			continue
 		case "--timeout":
 			if !optionsAllowed || !parseIntOption(&i, args, &opt.TimeoutSec) {

@@ -283,7 +283,9 @@ func (st *State) displayCard(c *myui.Context) {
 			myui.Checkbox(c, &st.Form.FullScreen, T("Full screen"))
 			myui.Checkbox(c, &st.Form.KeepSession, T("Keep session"))
 			myui.Checkbox(c, &st.Form.Minimized, T("Minimized"))
+			myui.Checkbox(c, &st.Form.NoScaleInherit, T("No inherited scaling"))
 		})
+		myui.Text(c, T("No inherited scaling hint")).FontSize(11).TextColor(t.TextMuted).Wrap()
 		st.field(c, "timeout", T("Timeout")+" ("+T("Second")+")", func() {
 			myui.TextInput(c.Key("timeout"), &st.TimeoutText).Height(30)
 		})
@@ -353,7 +355,7 @@ func (st *State) sizeHint() string {
 	case store.SizeScale:
 		return T("Stretch: the desktop keeps its resolution; a smaller window shrinks the whole picture to fit, a bigger window leaves it at its size in the middle.")
 	}
-	return T("Fixed: the window and the desktop stay at the width and height below.")
+	return T("Fixed: the window and the desktop stay at the width and height below (a screen that cannot hold that size cuts them down).")
 }
 
 // sizeChoice is the window-size segmented control: an index in the State

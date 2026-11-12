@@ -66,6 +66,27 @@ func TestDefaultWindowRectScalesForTheDisplayDPI(t *testing.T) {
 	}
 }
 
+// 子会话的桌面 dpi 默认跟着窗口所在的屏：150% 的屏上就是一个 150% 的子会话。
+// 勾了「禁用缩放自动继承」且没写 --scale 时钉成 96（100%），写了自己的 --scale 就听自己的。
+func TestGuestDPIFollowsTheScreenUnlessAsked(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  *StartOptions
+		dpi  uint32
+		want uint32
+	}{
+		{"the screen's dpi by default", &StartOptions{}, 144, 144},
+		{"no dpi at all means 96", &StartOptions{}, 0, 96},
+		{"no inherited scaling keeps 100%", &StartOptions{NoScaleInherit: true}, 144, 96},
+		{"an explicit scale wins over the option", &StartOptions{NoScaleInherit: true, Scale: 150}, 144, 144},
+	}
+	for _, c := range cases {
+		if got := guestDPI(c.opt, c.dpi); got != c.want {
+			t.Errorf("%s: guestDPI = %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
 // 顶栏自己也得跟着 dpi 长：40 像素照搬到 150% 的屏上，关闭按钮就只有三分之二。
 func TestBarMetricsFollowTheDPI(t *testing.T) {
 	for _, c := range []struct {

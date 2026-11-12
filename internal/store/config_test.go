@@ -90,6 +90,16 @@ func TestSessionArgsCarryTheScale(t *testing.T) {
 	}
 }
 
+func TestSessionArgsCarryNoScaleInherit(t *testing.T) {
+	joined := strings.Join(Session{NoScaleInherit: true}.Args(), " ")
+	if !strings.Contains(joined, " --no-scale-inherit") {
+		t.Fatalf("the option is missing from the command line: %q", joined)
+	}
+	if got := strings.Join((Session{}).Args(), " "); strings.Contains(got, "--no-scale-inherit") {
+		t.Fatalf("a session that inherits the scaling spells the option out: %q", got)
+	}
+}
+
 func TestNormalizeSizeMode(t *testing.T) {
 	cases := map[string]string{
 		"":         SizeFit,

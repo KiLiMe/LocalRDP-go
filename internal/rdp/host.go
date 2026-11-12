@@ -187,10 +187,10 @@ func applyDisplay(s *hostState) bool {
 	if int(w) == s.appliedW && int(h) == s.appliedH && int(ds) == s.appliedScale {
 		return true
 	}
-	dpi := int32(windowDPI(uintptr(s.hwnd)))
-	if dpi == 0 {
-		dpi = 96
-	}
+	// The physical size says how big the desktop is in inches, which is what
+	// tells the guest its dpi: the window's own, so the child session runs at
+	// the screen's scaling unless --no-scale-inherit asked for 100%.
+	dpi := int32(guestDPI(&s.opt, windowDPI(uintptr(s.hwnd))))
 	physW := clampI32(w*254/(10*dpi), 10, 10000)
 	physH := clampI32(h*254/(10*dpi), 10, 10000)
 

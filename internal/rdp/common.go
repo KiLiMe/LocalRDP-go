@@ -33,25 +33,28 @@ const (
 
 // StartOptions mirrors StartOptions in src/common.hpp.
 type StartOptions struct {
-	Width      int
-	Height     int
-	X          int
-	Y          int
-	Scale      int // 0 = no scale asked for (the window's own pixels); otherwise 100-500
-	TimeoutSec int
-	WorkDir    string
-	Title      string
-	User       string
-	Password   string
-	Command    string // full command line; empty means interactive desktop
-	Minimized  bool
-	Hidden     bool
-	Clipboard  bool
-	Drives     bool
-	ViewOnly   bool
-	KeepSess   bool
-	Desktop    bool
-	Fullscreen bool
+	Width  int
+	Height int
+	X      int
+	Y      int
+	Scale  int // 0 = no scale asked for (the window's own pixels); otherwise 100-500
+	// NoScaleInherit keeps the child session at 100% when Scale is 0: the
+	// screen's own scaling is not handed to it.
+	NoScaleInherit bool
+	TimeoutSec     int
+	WorkDir        string
+	Title          string
+	User           string
+	Password       string
+	Command        string // full command line; empty means interactive desktop
+	Minimized      bool
+	Hidden         bool
+	Clipboard      bool
+	Drives         bool
+	ViewOnly       bool
+	KeepSess       bool
+	Desktop        bool
+	Fullscreen     bool
 	// SizeMode is how the window relates to the session resolution: fit
 	// (default), fixed or scale. See store.NormalizeSizeMode.
 	SizeMode string
