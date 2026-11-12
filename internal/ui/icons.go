@@ -29,6 +29,7 @@ var (
 	iconCopy        = paths("M9 9h10v10H9z", "M15 5H5v10")
 	iconBroom       = paths("M4 20l6-6", "M9 9l6 6", "M14 4l6 6", "M8 10l6 6-3 2-5-5z")
 	iconRefresh     = paths("M20 11a8 8 0 1 0-2.3 6.3", "M20 4v7h-7")
+	iconRepair      = paths("M15 4l5 5-3 3-5-5z", "M12 7l-8 8 4 4 8-8")
 	iconTrash       = paths("M4 7h16", "M9 7V4h6v3", "M6 7l1 13h10l1-13", "M10 11v6", "M14 11v6")
 	iconFolderOpen  = paths("M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1", "M3 9h18l-2 9H5z")
 	iconLogoff      = paths("M15 12H4", "M10 8l-4 4 4 4", "M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4")

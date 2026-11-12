@@ -31,6 +31,21 @@ func cmdStart(opt StartOptions) int {
 	// before anything can return early, so a window that never opened still
 	// leaves a line behind.
 	logf("cmdStart begin: desktop=%v size=%s scale=%d w=%d h=%d", opt.Desktop, store.NormalizeSizeMode(opt.SizeMode), opt.Scale, opt.Width, opt.Height)
+	// 同一个模式已经有窗口：把它叫到前面，不再开第二个（重复点是常事）。
+	mode := "start"
+	if opt.Desktop {
+		mode = "desktop"
+	}
+	if rec, ok := reusableHost(mode); ok && focusHost(rec) {
+		printOutf("A %s window is already open (pid=%d); bringing it to the front.", mode, rec.PID)
+		logf("复用已有宿主 pid=%d", rec.PID)
+		return int(ExitOk)
+	}
+	// 没有窗口的宿主既叫不上来也关不掉自己：先收掉再继续，否则它就一直
+	// 锁着 localrdp.exe（见 hosts.go）。
+	if n := reapWindowlessHosts(); n > 0 {
+		printOutf("Closed %d host process(es) that had no window.", n)
+	}
 	if sid := getChildSessionID(); sid != kNoSession {
 		if sessionAlive(sid) {
 			printOutf("A child session already exists (id=%d). Run `localrdp stop` first.", sid)
@@ -88,21 +103,31 @@ func currentUserQualified() string {
 
 // cmdStop 对应 src/start.cpp 的 CmdStop()。
 func cmdStop() int {
+	code := int(ExitOk)
+	// 先注销子会话：宿主收到断开事件会自己干净退出（也才有机会补 Disconnect）。
 	sid := getChildSessionID()
-	if sid == kNoSession {
+	if sid != kNoSession && sessionAlive(sid) {
+		if wtLogoffSession(sid, true) {
+			printOutf("Logged off child session %d.", sid)
+		} else {
+			printErrf("Failed to log off child session %d.", sid)
+			code = int(ExitError)
+		}
+		// 给宿主一点时间走完断开→退出的路。
+		sleepMS(1500)
+	} else {
 		printOut("No child session is active.")
-		return int(ExitOk)
 	}
-	if !sessionAlive(sid) {
-		printOutf("Child session %d is already gone.", sid)
-		return int(ExitOk)
+	// 再收宿主窗口：没跟着退出的是摊位（没有窗口、不听 WM_CLOSE、锁着 exe）。
+	if closed, failed := stopAllHosts(); closed > 0 || failed > 0 {
+		if failed > 0 {
+			printErrf("%d host process(es) could not be closed.", failed)
+			code = int(ExitError)
+		} else {
+			printOutf("Closed %d host window(s).", closed)
+		}
 	}
-	if wtLogoffSession(sid, true) {
-		printOutf("Logged off child session %d.", sid)
-		return int(ExitOk)
-	}
-	printErrf("Failed to log off child session %d.", sid)
-	return int(ExitError)
+	return code
 }
 
 func splitCommand(rest []string) string {

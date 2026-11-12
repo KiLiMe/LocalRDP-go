@@ -30,6 +30,26 @@ func parseSessionID(out string) string {
 	return ""
 }
 
+// parseHosts reads status' Hosts line: how many session windows it found.
+// "3 registered, 1 without a window" → 3.
+func parseHosts(out string) int {
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "Hosts") {
+			continue
+		}
+		_, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		count, _, _ := strings.Cut(strings.TrimSpace(value), " ")
+		if n, err := strconv.Atoi(count); err == nil {
+			return n
+		}
+	}
+	return 0
+}
+
 // copyText puts s on the clipboard.
 func copyText(s string) error {
 	cmd := exec.Command("clip.exe")

@@ -51,7 +51,9 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	}
 	defer win.OleUninitialize()
 
-	s := &hostState{opt: opt, jobPath: jobPath, host: newAxHost(), m: newBarMetrics(startDPI(&opt))}
+	s := &hostState{opt: opt, jobPath: jobPath, host: newAxHost()}
+	s.hostDPI = startDPI(&opt)
+	s.m = newBarMetrics(s.hostDPI)
 	s.sizeMode = store.NormalizeSizeMode(opt.SizeMode)
 	if opt.Fullscreen {
 		// 全屏就是让画面填满屏幕，和尺寸档冲突：全屏优先。
@@ -139,6 +141,9 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	if !win32.RegisterHotKey(uintptr(s.hwnd), hotkeyFullScreen, win32.ModControl|win32.ModAlt|win32.ModNoRepeat, 'F') {
 		logWarn("Ctrl+Alt+F 热键注册失败，只能用顶栏按钮切全屏")
 	}
+	// 先把自己登记进去：从这一步起，就算消息循环之后卡死，`localrdp
+	// hosts`/`stop` 也能找到这个窗口（见 hosts.go）。
+	s.registerSelf()
 
 	// 抽干一次消息队列，避免尺寸消息早于控件创建到达。
 	var msg win.MSG
@@ -205,9 +210,14 @@ func RunRdpSession(opt StartOptions, jobPath string) int {
 	go func() {
 		sleepMS(6000)
 		logError("清理超时，强制退出")
+		// 清理卡住时也别留一个处于断开状态的子会话。
+		s.forceCleanup("清理超时")
 		os.Exit(int(ExitOk))
 	}()
 	logf("消息循环已退出，开始清理")
+	// 还没断开就退出＝把半开的握手留给下一次连接，先干净地挂断。
+	s.hangUpCleanly()
+	s.unregisterSelf()
 	stopClipHost()
 	logf("剪辑板宿主已停止")
 	if s.host != nil {

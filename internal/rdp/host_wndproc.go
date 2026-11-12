@@ -232,7 +232,10 @@ func wndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	case win.WM_CLOSE:
 		logf("WM_CLOSE ever=%v done=%v seen=%v", s.everConnected, s.discDone, s.discSeen)
 		if !s.everConnected {
-			win.DestroyWindow(hwnd)
+			// 不 DestroyWindow：控件在 WM_DESTROY 里拆会卡住（就是下面那个
+			// 定时器分支绕开的那件事），进程会留着没有窗口、把 exe 锁死。
+			win.ShowWindow(hwnd, win.SW_HIDE)
+			win.PostQuitMessage(0)
 			return 0
 		}
 		if s.discSeen || s.discDone {

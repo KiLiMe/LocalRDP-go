@@ -113,7 +113,7 @@ func readRegDword(root uintptr, sub, name string, def uint32) uint32 {
 	return v
 }
 
-type serviceStatusProcess struct {
+type serviceStatus struct {
 	ServiceType             uint32
 	CurrentState            uint32
 	ControlsAccepted        uint32
@@ -121,8 +121,14 @@ type serviceStatusProcess struct {
 	ServiceSpecificExitCode uint32
 	CheckPoint              uint32
 	WaitHint                uint32
-	ProcessID               uint32
-	ServiceFlags            uint32
+}
+
+// serviceStatusProcess is SERVICE_STATUS_PROCESS: SERVICE_STATUS plus the two
+// fields QueryServiceStatusEx adds.
+type serviceStatusProcess struct {
+	serviceStatus
+	ProcessID    uint32
+	ServiceFlags uint32
 }
 
 func serviceRunning(name string) bool {
@@ -296,6 +302,7 @@ func printStatus(r EnvReport) {
 	if r.TransportPipe != "" {
 		line("TransportPipe", r.TransportPipe)
 	}
+	line("Hosts", describeHosts())
 	if r.Fault != "" {
 		line("Fault", string(r.Fault)+" "+r.Fault.Short())
 	}

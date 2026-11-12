@@ -52,6 +52,10 @@ type hostState struct {
 	axHwnd win.HWND
 	// m is the bar's numbers for the dpi of the screen the window is on.
 	m barMetrics
+	// hostDPI is the dpi of the screen the window opened on, and the one the
+	// session's scale follows. It is remembered because the window's own dpi
+	// falls back to 96 once the child session has taken the console over.
+	hostDPI uint32
 	// view is the child window the control lives in: the bar above it belongs
 	// to this process, so the control gets the rest of the window.
 	view win.HWND
@@ -77,8 +81,17 @@ type hostState struct {
 	overlayShown                     bool
 	appliedW, appliedH, appliedScale int
 	// retrying is set while a reconnect is between Disconnect and Connect.
-	retrying   bool
-	lastToggle time.Time
+	retrying bool
+	// tlsRetries counts the connects this window made again after the local
+	// transport cut the handshake (E202): a half-open transport clears by
+	// itself, so the first failures are not the verdict (see host_recover.go).
+	tlsRetries int
+	// registryPath is this process's line in the host book (hosts.go): what
+	// `localrdp hosts` and `localrdp stop` read to find this window even when
+	// its own message loop can no longer act. Empty when the write failed.
+	registryPath string
+	registryRec  hostRecord
+	lastToggle   time.Time
 	// sizeMode is store.SizeFit, SizeFixed or SizeScale: what the window
 	// does with its size while the session runs.
 	sizeMode string

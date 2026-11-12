@@ -1,6 +1,10 @@
 package rdp
 
-import "testing"
+import (
+	"testing"
+
+	"localrdp/internal/store"
+)
 
 // 放得下的请求原样返回：宽取偶，高加上顶栏，水平居中。
 //
@@ -73,23 +77,39 @@ func TestDefaultWindowRectScalesForTheDisplayDPI(t *testing.T) {
 	}
 }
 
-// 子会话的桌面 dpi 默认跟着窗口所在的屏：150% 的屏上就是一个 150% 的子会话。
-// 勾了「禁用缩放自动继承」且没写 --scale 时钉成 96（100%），写了自己的 --scale 就听自己的。
-func TestGuestDPIFollowsTheScreenUnlessAsked(t *testing.T) {
+// 子会话的桌面缩放默认跟着窗口所在的屏：150% 的屏上是 150% 的会话（桌面像素就是窗口
+// 像素，没有第二次拉伸）。拉伸档只认 --scale——它的画面本来就要被 SmartSizing 缩一次；
+// 勾了「禁用缩放自动继承」且没写 --scale 时钉成 100。
+func TestDesktopScaleFollowsTheScreenUnlessAsked(t *testing.T) {
 	cases := []struct {
 		name string
-		opt  *StartOptions
+		opt  StartOptions
+		mode string
 		dpi  uint32
-		want uint32
+		want int32
 	}{
-		{"the screen's dpi by default", &StartOptions{}, 144, 144},
-		{"no dpi at all means 96", &StartOptions{}, 0, 96},
-		{"no inherited scaling keeps 100%", &StartOptions{NoScaleInherit: true}, 144, 96},
-		{"an explicit scale wins over the option", &StartOptions{NoScaleInherit: true, Scale: 150}, 144, 144},
+		{"the screen's dpi by default", StartOptions{}, store.SizeFit, 144, 150},
+		{"no dpi at all means 100%", StartOptions{}, store.SizeFit, 0, 100},
+		{"a 120 dpi screen is 125%", StartOptions{}, store.SizeFit, 120, 125},
+		{"fixed follows the screen too", StartOptions{}, store.SizeFixed, 192, 200},
+		{"no inherited scaling keeps 100%", StartOptions{NoScaleInherit: true}, store.SizeFit, 144, 100},
+		{"stretch takes --scale", StartOptions{Scale: 175}, store.SizeScale, 144, 175},
+		{"stretch without a scale is 100%", StartOptions{}, store.SizeScale, 144, 100},
+		{"an explicit scale wins over the option", StartOptions{NoScaleInherit: true, Scale: 150}, store.SizeScale, 144, 150},
 	}
 	for _, c := range cases {
-		if got := guestDPI(c.opt, c.dpi); got != c.want {
-			t.Errorf("%s: guestDPI = %d, want %d", c.name, got, c.want)
+		if got := desktopScale(c.opt, c.mode, c.dpi); got != c.want {
+			t.Errorf("%s: desktopScale = %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
+// 物理尺寸与实际缩放因子必须说同一件事：150% 就是 144 dpi，不然客人按一个数排版、
+// 按另一个数画。
+func TestLayoutDPIMatchesTheScale(t *testing.T) {
+	for _, c := range []struct{ ds, want int32 }{{100, 96}, {125, 120}, {150, 144}, {200, 192}} {
+		if got := layoutDPI(c.ds); got != c.want {
+			t.Errorf("layoutDPI(%d) = %d, want %d", c.ds, got, c.want)
 		}
 	}
 }

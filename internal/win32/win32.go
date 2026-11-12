@@ -199,6 +199,33 @@ func PostCommand(pid int, cmd uintptr) bool {
 	return true
 }
 
+// HasHostWindow reports whether that process still has a host window. A host
+// whose message loop stopped answering has none left: the window is gone, the
+// process is not, and this is the only thing that tells the two apart.
+func HasHostWindow(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	return findHostWindow(pid) != 0
+}
+
+// CloseWindow posts WM_CLOSE to that process's host window, asked like the
+// window's own × button would: the host then disconnects and leaves.
+func CloseWindow(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	found := findHostWindow(pid)
+	if found == 0 {
+		return false
+	}
+	procPostMessageW.Call(found, uintptr(wmClose), 0, 0)
+	return true
+}
+
+// wmClose is WM_CLOSE.
+const wmClose = 0x0010
+
 // findHostWindow is the host window of that process, or 0.
 func findHostWindow(pid int) uintptr {
 	target := uint32(pid)

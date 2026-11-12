@@ -494,6 +494,26 @@ func (msgs Messages) LogOffChildSession() string {
 	return Catalog.Format(msgs.locale, "logOffChildSession", nil)
 }
 
+// RepairTransport says "Repair transport"
+// in the language the app shows.
+func RepairTransport() string { return In(i18n.Locale()).RepairTransport() }
+
+// RepairTransport says "Repair transport"
+// in the language of msgs.
+func (msgs Messages) RepairTransport() string {
+	return Catalog.Format(msgs.locale, "repairTransport", nil)
+}
+
+// CloseHosts says "Close leftover hosts"
+// in the language the app shows.
+func CloseHosts() string { return In(i18n.Locale()).CloseHosts() }
+
+// CloseHosts says "Close leftover hosts"
+// in the language of msgs.
+func (msgs Messages) CloseHosts() string {
+	return Catalog.Format(msgs.locale, "closeHosts", nil)
+}
+
 // ForgetPassword says "Forget password"
 // in the language the app shows.
 func ForgetPassword() string { return In(i18n.Locale()).ForgetPassword() }
@@ -812,6 +832,66 @@ func ErrLogOff() string { return In(i18n.Locale()).ErrLogOff() }
 // in the language of msgs.
 func (msgs Messages) ErrLogOff() string {
 	return Catalog.Format(msgs.locale, "errLogOff", nil)
+}
+
+// RepairingTransport says "Repairing the transport…"
+// in the language the app shows.
+func RepairingTransport() string { return In(i18n.Locale()).RepairingTransport() }
+
+// RepairingTransport says "Repairing the transport…"
+// in the language of msgs.
+func (msgs Messages) RepairingTransport() string {
+	return Catalog.Format(msgs.locale, "repairingTransport", nil)
+}
+
+// TransportRepaired says "Transport repaired."
+// in the language the app shows.
+func TransportRepaired() string { return In(i18n.Locale()).TransportRepaired() }
+
+// TransportRepaired says "Transport repaired."
+// in the language of msgs.
+func (msgs Messages) TransportRepaired() string {
+	return Catalog.Format(msgs.locale, "transportRepaired", nil)
+}
+
+// RepairCancelled says "The repair was cancelled."
+// in the language the app shows.
+func RepairCancelled() string { return In(i18n.Locale()).RepairCancelled() }
+
+// RepairCancelled says "The repair was cancelled."
+// in the language of msgs.
+func (msgs Messages) RepairCancelled() string {
+	return Catalog.Format(msgs.locale, "repairCancelled", nil)
+}
+
+// ErrRepair says "The repair did not finish."
+// in the language the app shows.
+func ErrRepair() string { return In(i18n.Locale()).ErrRepair() }
+
+// ErrRepair says "The repair did not finish."
+// in the language of msgs.
+func (msgs Messages) ErrRepair() string {
+	return Catalog.Format(msgs.locale, "errRepair", nil)
+}
+
+// ClosingHosts says "Closing the leftover hosts…"
+// in the language the app shows.
+func ClosingHosts() string { return In(i18n.Locale()).ClosingHosts() }
+
+// ClosingHosts says "Closing the leftover hosts…"
+// in the language of msgs.
+func (msgs Messages) ClosingHosts() string {
+	return Catalog.Format(msgs.locale, "closingHosts", nil)
+}
+
+// ErrCloseHosts says "Closing the hosts failed."
+// in the language the app shows.
+func ErrCloseHosts() string { return In(i18n.Locale()).ErrCloseHosts() }
+
+// ErrCloseHosts says "Closing the hosts failed."
+// in the language of msgs.
+func (msgs Messages) ErrCloseHosts() string {
+	return Catalog.Format(msgs.locale, "errCloseHosts", nil)
 }
 
 // LogCopied says "Log copied"

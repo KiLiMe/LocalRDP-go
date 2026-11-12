@@ -211,6 +211,7 @@ func (s *hostState) setDPI(dpi uint32) {
 		return
 	}
 	s.m = m
+	s.hostDPI = dpi
 	if s.hwnd != 0 {
 		w, h := clientDesktopSize(s.hwnd)
 		s.placeView(w, h)

@@ -37,7 +37,7 @@ type StartOptions struct {
 	Height int
 	X      int
 	Y      int
-	Scale  int // 0 = no scale asked for (the window's own pixels); otherwise 100-500
+	Scale  int // 0 = no scale asked for: fit and fixed follow the screen, stretch stays at 100
 	// NoScaleInherit keeps the child session at 100% when Scale is 0: the
 	// screen's own scaling is not handed to it.
 	NoScaleInherit bool

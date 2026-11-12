@@ -21,6 +21,12 @@ type Actions interface {
 	RefreshStatus()
 	// LogOff ends the child session the window is showing.
 	LogOff()
+	// CloseHosts ends the session windows a stop found: the leftovers that no
+	// window shows any more.
+	CloseHosts()
+	// RepairTransport restarts the local RDP transport, which is what clears
+	// a handshake that keeps failing (E202). It asks for one approval.
+	RepairTransport()
 	// ForgetPassword drops the cached password.
 	ForgetPassword()
 	// OpenDataFolder shows %LOCALAPPDATA%\LocalRDP.
@@ -74,6 +80,10 @@ type State struct {
 	// names it, empty when none does.
 	Open      bool
 	SessionID string
+	// Hosts is how many session windows say they are running (status' Hosts
+	// line). A count that is not zero while nothing is open means leftovers:
+	// windows that lost their message loop and only a stop clears.
+	Hosts int
 
 	// Log is the tail of the child processes' log, and LogOpen whether the
 	// console shows it: it is a card of its own, folded until asked for.

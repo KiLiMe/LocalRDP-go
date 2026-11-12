@@ -25,13 +25,15 @@ func (s *hostState) onEvent(id int32, args []variant) {
 	switch id {
 	case 2: // OnConnected
 		s.everConnected = true
+		s.tlsRetries = 0
+		s.refreshSelf()
 		printOut("Connected.")
 		logInfo("Connected.")
 		s.invalidateBar()
 		if s.baseW == 0 {
 			s.baseW, s.baseH = s.viewSize()
 			// 连接时的缩放就是基准：scale 档以后按窗口/基准的比例往上走。
-			s.baseScale = s.explicitScale()
+			s.baseScale = s.layoutScale()
 			logf("会话尺寸基准 %dx%d（size=%s）", s.baseW, s.baseH, s.sizeMode)
 		}
 		if s.opt.Fullscreen {
@@ -46,6 +48,9 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		setWindowText(uintptr(s.hwnd), sessionTitle(s.opt.Title, sid))
 		printOutf("Logon complete. Child session id=%d", sid)
 		logf("Logon complete. Child session id=%d", sid)
+		// 会话号到这一步才知道，登记表（hosts.go）跟着写一次：`localrdp
+		// hosts`/`status` 靠它区分活会话与残留。
+		s.refreshSelf()
 		if s.opt.Clipboard {
 			win.SetTimer(s.hwnd, kTimerClip, 800, 0)
 		}
@@ -68,11 +73,17 @@ func (s *hostState) onEvent(id int32, args []variant) {
 		s.discSeen = true
 		s.loggedIn = false
 		s.invalidateBar()
+		// 断开之后那个号就不属于这个窗口了，留着只会让人去 stop 一个不存在的会话。
+		s.forgetSessionInBook()
 		if s.retrying {
 			// 重连时断开是它自己要求的第一步。
 			return
 		}
 		if code, detail, ok := faultForDisconnect(s.discReason, s.extReason, s.everConnected); ok {
+			// 握手被本机掐掉是半开状态，会自己消退：先重试，别急着报 E202。
+			if code == fault.TLSHandshake && s.retryTLSHandshake() {
+				return
+			}
 			s.fail(code, detail)
 		}
 		// 断开之后控件只剩一块白板：把窗口收掉，别留一个既没画面也不

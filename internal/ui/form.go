@@ -176,7 +176,15 @@ func (st *State) statusCard(c *myui.Context) {
 			iconButton(c, iconLogoff, locales.LogOffChildSession(), false, func() {
 				st.Act.Do(st.Act.LogOff)
 			})
+		} else if st.Hosts > 0 {
+			// 没有子会话却还有宿主登记：窗口早就没了，只能收掉。
+			iconButton(c, iconBroom, locales.CloseHosts(), false, func() {
+				st.Act.Do(st.Act.CloseHosts)
+			})
 		}
+		cardAction(c, iconRepair, locales.RepairTransport(), func() {
+			st.Act.Do(st.Act.RepairTransport)
+		})
 	}, func() {
 		myui.Row(c).Gap(8).Children(func() {
 			st.tile(c, locales.ChildSession(), pickText(st.Open, st.SessionID, locales.None()), st.Open)

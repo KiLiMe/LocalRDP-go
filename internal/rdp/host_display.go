@@ -15,7 +15,7 @@ func applyDisplay(s *hostState) bool {
 		return false
 	}
 	w, h := s.viewSize()
-	ds := s.explicitScale()
+	ds := s.layoutScale()
 	if s.sizeMode != store.SizeFit {
 		if s.baseW <= 0 || s.baseH <= 0 {
 			// 还没连上，基准尺寸未知，先不动。
@@ -30,9 +30,9 @@ func applyDisplay(s *hostState) bool {
 		return true
 	}
 	// The physical size says how big the desktop is in inches, which is what
-	// tells the guest its dpi: the window's own, so the child session runs at
-	// the screen's scaling unless --no-scale-inherit asked for 100%.
-	dpi := int32(guestDPI(&s.opt, windowDPI(uintptr(s.hwnd))))
+	// tells the guest its dpi: the one the scale factor stands for, so the
+	// guest cannot read one scaling from this and another from the factor.
+	dpi := layoutDPI(ds)
 	physW := clampI32(w*254/(10*dpi), 10, 10000)
 	physH := clampI32(h*254/(10*dpi), 10, 10000)
 
@@ -76,16 +76,8 @@ func clampI32(v, lo, hi int32) int32 {
 	return v
 }
 
-// explicitScale is the desktop scale the user asked for with --scale; 0 asks
-// for no scaling at all. Nothing follows the screen's DPI any more: the
-// window is DPI aware already, so its pixels are the desktop's pixels.
-func (s *hostState) explicitScale() int32 {
-	// Only the scale mode asks for a desktop scale: fit follows the window's
-	// pixels and fixed keeps the size it connected with, so a --scale on
-	// either of them would magnify on top of that.
-	if s.sizeMode != store.SizeScale {
-		return 100
-	}
-	ds, _ := resolveScale(s.hwnd, &s.opt)
-	return ds
+// layoutScale is the desktop scale this session lays out at; desktopScale
+// says what each size mode asks for.
+func (s *hostState) layoutScale() int32 {
+	return desktopScale(s.opt, s.sizeMode, s.hostDPI)
 }

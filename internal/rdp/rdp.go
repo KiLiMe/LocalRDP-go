@@ -251,15 +251,13 @@ func viewSize(hwnd win.HWND, opt *StartOptions) (int32, int32) {
 	return 1280, 800
 }
 
-// resolveScale is the desktop scale the session starts with: --scale when
-// it is given, 100 otherwise.
+// resolveScale is the desktop scale the stretch mode starts with: --scale
+// when it is given, 100 otherwise.
 //
-// The window is already DPI aware (the process is per-monitor v2), so a
-// screen at 150% gives a window with 1.5 times the pixels, and the session
-// takes the window's pixels as its desktop. Handing the session the DPI
-// factor too made the guest lay out at 150% in that same pixel grid and then
-// SmartSizing stretched the result, which is the picture growing twice.
-// A machine that wants bigger text in the child session says so: --scale.
+// Stretch is the one mode where the scale must not follow the screen: the
+// control lays the desktop out in baseW×baseH pixels and SmartSizing fits that
+// picture into a window of another size, so a 150% layout would be magnified a
+// second time. A machine that wants bigger text there says so: --scale.
 func resolveScale(_ win.HWND, opt *StartOptions) (int32, int32) {
 	pct := int32(opt.Scale)
 	if pct <= 0 {
@@ -274,23 +272,44 @@ func resolveScale(_ win.HWND, opt *StartOptions) (int32, int32) {
 	return pct, deviceScaleFor(pct)
 }
 
-// guestDPI is the dpi the session's desktop is told it has, from the dpi its
-// window is on. That number goes into the physical size
-// UpdateSessionDisplaySettings reports, and the guest lays out at the dpi it
-// implies: on a 150% screen the child session is a 150% session, the same as
-// the host's own windows.
+// desktopScale is the desktop scale factor the session lays out at. Stretch
+// takes --scale; fit and fixed follow the screen the window is on, because
+// there the desktop's pixels are the window's pixels — a 150% screen gets a
+// 150% session whose text is the size of the host's own windows.
 //
-// --no-scale-inherit says no, when no --scale was given: the session stays at
-// 96 dpi whatever the screen is, so its text keeps the size it would have on a
-// 100% screen instead of growing with the host's scaling.
-func guestDPI(opt *StartOptions, dpi uint32) uint32 {
-	if opt != nil && opt.NoScaleInherit && opt.Scale <= 0 {
-		return 96
+// --no-scale-inherit says no: those two modes then stay at 100% whatever the
+// screen is, so the session's text keeps the size it would have on a 100%
+// screen instead of growing with the host's scaling.
+func desktopScale(opt StartOptions, sizeMode string, hostDPI uint32) int32 {
+	if sizeMode == store.SizeScale {
+		ds, _ := resolveScale(0, &opt)
+		return ds
 	}
+	if opt.NoScaleInherit {
+		return 100
+	}
+	return screenScale(hostDPI)
+}
+
+// screenScale is the desktop scale factor a screen dpi stands for: 96 is
+// 100%, 144 is 150%, rounded to the 25% steps the factor comes in.
+func screenScale(dpi uint32) int32 {
 	if dpi == 0 {
-		return 96
+		dpi = 96
 	}
-	return dpi
+	pct := int32((dpi*100 + 48) / 96) // the nearest percent
+	pct = (pct + 12) / 25 * 25        // then the nearest step
+	return clampI32(pct, 100, 500)
+}
+
+// layoutDPI is the dpi a desktop scale factor stands for. The physical size
+// UpdateSessionDisplaySettings reports is measured against it, so the guest
+// reads the same scaling from both numbers.
+func layoutDPI(ds int32) int32 {
+	if ds < 100 {
+		ds = 100
+	}
+	return 96 * ds / 100
 }
 
 // deviceScaleFor maps a desktop scale factor onto the device scale factor the
@@ -466,15 +485,9 @@ func (h *axHost) configure(opt *StartOptions) bool {
 	h.putExtendedBool("EnableHardwareMode", true)
 	h.putExtendedBool("EnableFrameBufferRedirection", true)
 
-	ds, device := resolveScale(h.hwnd, opt)
-	if store.NormalizeSizeMode(opt.SizeMode) != store.SizeScale {
-		// Only the scale mode carries a --scale: fit works in the window's
-		// own pixels and fixed keeps what it connected with, so a scale on
-		// either of them would magnify the picture a second time.
-		ds, device = 100, deviceScaleFor(100)
-	}
+	ds := desktopScale(*opt, store.NormalizeSizeMode(opt.SizeMode), windowDPI(uintptr(h.hwnd)))
 	h.putExtendedI4("DesktopScaleFactor", ds)
-	h.putExtendedI4("DeviceScaleFactor", device)
+	h.putExtendedI4("DeviceScaleFactor", deviceScaleFor(ds))
 
 	h.appliedW, h.appliedH, h.appliedScale = int(desk_w), int(desk_h), int(ds)
 	logf("Initial desktop %dx%d @%d%% size=%s", desk_w, desk_h, ds, store.NormalizeSizeMode(opt.SizeMode))

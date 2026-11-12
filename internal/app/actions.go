@@ -195,16 +195,40 @@ func (a *actions) finish(id string, code int) {
 // RefreshStatus asks what is open and what is granted.
 func (a *actions) RefreshStatus() {
 	out, code := runSelf("status")
-	id := ""
+	id, hosts := "", 0
 	if code == 0 || code == 2 {
 		id = parseSessionID(out)
+		hosts = parseHosts(out)
 	}
 	open := id != ""
 	a.Do(func() {
 		a.St.SessionID = id
 		a.St.Open = open
+		a.St.Hosts = hosts
 	})
 	a.appendLog(nonEmptyLines(out))
+}
+
+// CloseHosts ends the session windows a stop finds: the ones no window shows
+// any more, which nothing else can reach.
+func (a *actions) CloseHosts() {
+	st := &a.St
+	if st.Busy {
+		return
+	}
+	st.Busy = true
+	st.Status = locales.ClosingHosts()
+	a.Invalidate()
+	go func() {
+		out, code := runSelf("stop")
+		a.appendLog(nonEmptyLines(out))
+		if code != 0 && code != 2 {
+			a.appendLog([]string{locales.ErrCloseHosts() + " (" + strconv.Itoa(code) + ")"})
+		}
+		a.setBusy(false, "")
+		a.Do(func() { a.St.Notify(locales.Done()) })
+		a.Do(a.RefreshStatus)
+	}()
 }
 
 // LogOff ends the child session.
@@ -225,6 +249,47 @@ func (a *actions) LogOff() {
 		a.setBusy(false, "")
 		a.Do(func() { a.St.Notify(locales.Done()) })
 		a.Do(a.RefreshStatus)
+	}()
+}
+
+// RepairTransport restarts the local RDP transport — TermService and what
+// depends on it — which is what clears a handshake that keeps failing (E202).
+// The approval it needs is the elevated child's; once it is done the session of
+// the form is opened again, because that is what the button is for.
+func (a *actions) RepairTransport() {
+	st := &a.St
+	if st.Busy {
+		return
+	}
+	st.Busy = true
+	st.Status = locales.RepairingTransport()
+	a.Invalidate()
+	go func() {
+		out, code := runSelf("repair")
+		a.appendLog(nonEmptyLines(out))
+		a.setBusy(false, "")
+		switch code {
+		case 0:
+			a.Do(func() {
+				a.St.Status = locales.TransportRepaired()
+				a.St.Notify(locales.TransportRepaired())
+			})
+			a.Do(a.RefreshStatus)
+			if !a.St.Open {
+				a.Do(a.OpenSession)
+			}
+		case 4: // 用户在批准窗口上按了取消
+			a.Do(func() {
+				a.St.Status = locales.RepairCancelled()
+				a.St.Notify(locales.RepairCancelled())
+			})
+		default:
+			line := locales.ErrRepair() + " (" + strconv.Itoa(code) + ")"
+			a.Do(func() {
+				a.St.Status = line
+				a.St.Notify(line)
+			})
+		}
 	}()
 }
 

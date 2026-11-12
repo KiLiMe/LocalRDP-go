@@ -21,6 +21,8 @@ func printHelp() {
 	printOut("  localrdp start [options] -- <program> [args...]")
 	printOut("  localrdp desktop [options] [-- <program> [args...]]")
 	printOut("  localrdp stop")
+	printOut("  localrdp hosts                    Session windows that are still running")
+	printOut("  localrdp repair                   Restart the local RDP transport (one admin prompt)")
 	printOut("  localrdp gui [options]")
 	printOut("  localrdp mcp")
 	printOut("  localrdp click <button> [--pid N]   Press a button without a mouse")
@@ -30,7 +32,8 @@ func printHelp() {
 	printOut("  --width N          Initial window client width (even; default ~5/6 of the monitor,\n                     cut down to the work area when it does not fit)")
 	printOut("  --height N         Initial window client height (same work-area limit)")
 	printOut("  --x N --y N        Host window position")
-	printOut("  --scale N          Desktop scale percent 100-500 (default: 100, the window's own pixels)")
+	printOut("  --scale N          Desktop scale percent for --size scale, 100-500 (default: 100;")
+	printOut("                     fit and fixed follow the screen's own scaling)")
 	printOut("  --no-scale-inherit With no --scale, keep the child session at 100%: the screen's own\n                     scaling (150% and so) is not handed to it")
 	printOut("  --size MODE        fit (default, window decides the resolution), fixed (window and")
 	printOut("                     session keep --width/--height, no resize border), or scale (the")
@@ -60,6 +63,9 @@ func printHelp() {
 	printOut("The child session is the same Windows account as this process. It is not a")
 	printOut("security boundary: files, tokens and installed apps are shared.")
 	printOut("Windows allows only one child session at a time.")
+	printOut("")
+	printOut("`repair` restarts TermService and the services that depend on it, and")
+	printOut("nothing else: no firewall, no listener, no credentials.")
 }
 
 func needValue(i int, args []string, flag string) bool {
@@ -369,6 +375,10 @@ func Run(args []string) int {
 		return int(ExitError)
 	case eqFold(verb, "stop"):
 		return cmdStop()
+	case eqFold(verb, "hosts"):
+		return cmdHosts()
+	case eqFold(verb, "repair"):
+		return cmdRepair()
 	case eqFold(verb, "gui"), eqFold(verb, "ui"):
 		return runGui(nil)
 	case eqFold(verb, "desktop"):
