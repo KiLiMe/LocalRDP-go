@@ -60,3 +60,7 @@ $env:LRDP_LIVE = '1'; go test ./internal/rdp -run Live -v   # 真开窗口的那
 `*_live_windows_test.go` 里的 `TestLive…` 会真的起一个子会话、量窗口矩形再注销，
 所以只有设了 `LRDP_LIVE=1` 才跑。跑之前先关掉自己的窗口（有一个会话窗口开着时它们会跳过），
 注销偶尔要几十秒，是会话在收尾，不是卡死。
+
+发版不手工：改 `mygo.json` 的 `version` → 提交推上 `main` → `git tag -a v<版本>` 推上去。
+`.github/workflows/ci.yml` 只有一个 workflow，`release` job 只认 `v*` tag，负责用
+`build.ps1 -Version <tag 去 v>` 打包并建 Release。
