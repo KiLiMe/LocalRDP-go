@@ -67,6 +67,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # 要上一个 tag 才画得出「这个版本的变化」
 
       - name: Go
         uses: actions/setup-go@v5
@@ -80,15 +82,59 @@ jobs:
         shell: pwsh
         run: pwsh .\Scripts\build.ps1 -Version $env:GITHUB_REF_NAME.Substring(1)
 
+      # 说明 = 每版都一样的固定前言（怎么下、怎么跑、首次使用）+ 上一个 tag 以来的提交 + 校验值。
+      # 固定前言写在这里，发版时不用手写；需要特别介绍时之后再 `gh release edit --notes-file`。
       - name: Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $ErrorActionPreference = 'Stop'
           $tag = $env:GITHUB_REF_NAME
           $ver = $tag.Substring(1)
           $exe = 'build/windows-amd64/localrdp.exe'
           $zip = "build/localrdp-$ver-windows-amd64.zip"
           if (-not (Test-Path $exe)) { throw "build produced no $exe" }
           if (-not (Test-Path $zip)) { throw "build produced no $zip" }
-          gh release create $tag $exe $zip --title "LocalRDP $tag" --generate-notes
+
+          $prev = git describe --tags --abbrev=0 "$tag^"
+          if ($LASTEXITCODE -eq 0 -and $prev) {
+            $range = "（$prev..$tag）"
+            $changes = (git log "$prev..$tag" --pretty=format:'- %s') -join "`n"
+          } else {
+            $range = ''
+            $changes = (git log $tag --pretty=format:'- %s') -join "`n"
+          }
+          $exeSha = (Get-FileHash $exe -Algorithm SHA256).Hash
+          $zipSha = (Get-FileHash $zip -Algorithm SHA256).Hash
+
+          $notes = @"
+          在 Windows 上开一个**子会话**（第二张桌面）当远程桌面用：不接管物理屏幕，也不开 RDP 端口。
+
+          ## 下载
+
+          - ``localrdp.exe`` — 单文件 10 MB 左右，不依赖 VC 运行时，也不需要装 Go。
+          - ``localrdp-$ver-windows-amd64.zip`` — 同一个 exe 连同 ``LICENSE``。
+
+          ## 运行
+
+          - 双击 = 图形界面；命令行 ``localrdp status``、``desktop``、``start <程序>``、``stop``、``click <按钮>``、``mcp``，
+            完整清单见仓库的 ``docs/使用说明.md``。
+          - 需要 Windows 10 / 11 **专业版**；首次运行会打开系统的子会话开关，需要点一次 UAC。
+          - ``start`` 模式还要两项账户特权（``SeTcbPrivilege``、``SeAssignPrimaryTokenPrivilege``），见 ``docs/手动授予特权.md``。
+
+          ## 这个版本的变化$range
+
+          $changes
+
+          ## 校验
+
+          ``````
+          exe  $exeSha
+          zip  $zipSha
+          ``````
+          "@
+          $notesPath = Join-Path $env:RUNNER_TEMP 'notes.md'
+          Set-Content -LiteralPath $notesPath -Value $notes -Encoding utf8
+
+          gh release create $tag $exe $zip --title "LocalRDP $tag" --notes-file $notesPath
