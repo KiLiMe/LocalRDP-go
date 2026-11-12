@@ -1,7 +1,7 @@
 {
   "name": "localrdp",
   "identifier": "com.localrdp.desktop",
-  "version": "2026.11.12.1",
+  "version": "2026.11.12.2",
   "publisher": "LocalRDP",
   "copyright": "(c) 2026 LocalRDP",
   "main": ".",
