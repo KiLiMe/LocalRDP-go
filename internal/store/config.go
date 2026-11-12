@@ -55,8 +55,11 @@ type Session struct {
 	Minimized  bool `json:"minimized,omitempty"`
 	// Timeout is how long the connection may take, in seconds.
 	Timeout int `json:"timeout,omitempty"`
-	// KeepSession leaves the child session up when the host window ends.
-	KeepSession bool `json:"keep_session,omitempty"`
+	// KeepSession leaves the child session up when the host window ends,
+	// which is what makes the next open resume the same session. It is on
+	// unless the settings file says otherwise, so the key is always
+	// written out: a missing key means an older file, and that reads true.
+	KeepSession bool `json:"keep_session"`
 }
 
 // DefaultTimeout is the connection timeout the form offers, as the command
@@ -236,7 +239,7 @@ func DefaultSettings() Settings {
 		Lang:          i18n.Detect(),
 		SavePasswords: true,
 		Remember:      true,
-		Last:          Session{Mode: "desktop", Title: "LocalRDP", Timeout: DefaultTimeout},
+		Last:          Session{Mode: "desktop", Title: "LocalRDP", Timeout: DefaultTimeout, KeepSession: true},
 	}
 }
 
@@ -329,7 +332,30 @@ func LoadSettings() Settings {
 	if s.Last.Timeout == 0 {
 		s.Last.Timeout = DefaultTimeout
 	}
+	// KeepSession defaults to on; only a settings file that spells out
+	// "keep_session": false turns it off.
+	if !settingsHasKey("keep_session") {
+		s.Last.KeepSession = d.Last.KeepSession
+	}
 	return s
+}
+
+// settingsHasKey reports whether the settings file spells out key inside
+// "last". A file written before the key existed leaves it out, and reading
+// that as false would silently change the default.
+func settingsHasKey(key string) bool {
+	b, err := os.ReadFile(SettingsFile())
+	if err != nil {
+		return false
+	}
+	var file struct {
+		Last map[string]json.RawMessage `json:"last"`
+	}
+	if json.Unmarshal(b, &file) != nil {
+		return false
+	}
+	_, ok := file.Last[key]
+	return ok
 }
 
 // SaveSettings writes the settings, making the folder it needs.

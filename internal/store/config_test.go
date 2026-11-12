@@ -1,6 +1,8 @@
 package store
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -149,6 +151,34 @@ func TestLoadSettingsFallsBackWhenMissing(t *testing.T) {
 	}
 	if got.Last.Timeout != DefaultTimeout {
 		t.Fatalf("a fresh install has timeout %d, want %d", got.Last.Timeout, DefaultTimeout)
+	}
+	if !got.Last.KeepSession {
+		t.Fatal("a fresh install keeps the session, so the next open can resume it")
+	}
+}
+
+// KeepSession is on unless the file says otherwise: a settings file from
+// before the key existed must not silently turn resume off.
+func TestKeepSessionDefaultsOn(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	if err := os.MkdirAll(filepath.Dir(SettingsFile()), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := `{"lang":"en","remember":true,"last":{"mode":"desktop","width":1920}}`
+	if err := os.WriteFile(SettingsFile(), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := LoadSettings(); !got.Last.KeepSession {
+		t.Fatal("a file without keep_session must read as on")
+	}
+
+	saved := DefaultSettings()
+	saved.Last.KeepSession = false
+	if err := SaveSettings(saved); err != nil {
+		t.Fatal(err)
+	}
+	if got := LoadSettings(); got.Last.KeepSession {
+		t.Fatal("an explicit false must stay off")
 	}
 }
 
