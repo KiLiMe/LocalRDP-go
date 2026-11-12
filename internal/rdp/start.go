@@ -52,11 +52,11 @@ func cmdStart(opt StartOptions) int {
 			return int(ExitConflict)
 		}
 		if sessionAlive(sid) {
-			// 刚注销的会话会在 WTS 里留一会儿（Disc）。把它当成“有人用”
-			// 就会让紧接着的下一次打开被拒——那正是“关了窗口就打不开”。
-			logf("清理残留子会话 id=%d（登记状态不是使用中）", sid)
-			printOutf("Cleaning up the leftover child session id=%d before starting.", sid)
-			wtLogoffSession(sid, false)
+			// 刚注销的会话（或 --keep-session 刻意留下的）会在 WTS 里挂一会儿
+			// Disc。RDP 服务端对同一个用户只会有一个会话：下一次连接直接接手
+			// 这个 Disc 的，所以这里只能放行——动手注销掉它，接手的那一次
+			// 连接就会被踢（日志 reason=3）。
+			logf("接手已有子会话 id=%d（状态不是使用中，留给这次连接接手）", sid)
 		} else {
 			// 子会话注销后 WTSGetChildSessionId 会留下旧 id，别被它卡住。
 			logWarn("忽略残留的子会话 id=" + win32.Itoa(int(sid)) + "（WTS 枚举里已不存在）")
