@@ -29,6 +29,14 @@ var (
 // wtsStateDown is WTS_CONNECTSTATE_CLASS's value for a session that is down.
 const wtsStateDown = 8
 
+// wtsStateActive and wtsStateConnected are the two states that mean someone
+// is still sitting in the session: a logged-off one lingers as Disc for a
+// while, and that is not the same thing as being in use.
+const (
+	wtsStateActive    = 0
+	wtsStateConnected = 1
+)
+
 // wtsSessionInfoRaw is the WTS_SESSION_INFOW layout, used inside wtsSessions
 // only: its WinStationName points into the buffer WTSFreeMemory hands back.
 type wtsSessionInfoRaw struct {
@@ -73,6 +81,18 @@ func wtsSessions() []wtsSessionInfo {
 func sessionAlive(id uint32) bool {
 	for _, s := range wtsSessions() {
 		if s.SessionID == id && s.State != wtsStateDown {
+			return true
+		}
+	}
+	return false
+}
+
+// sessionInUse reports whether the session still has a user in it. The
+// distinction matters right after a logoff: WTS keeps the session listed as
+// Disc, and taking that for "in use" made the next start refuse to run.
+func sessionInUse(id uint32) bool {
+	for _, s := range wtsSessions() {
+		if s.SessionID == id && (s.State == wtsStateActive || s.State == wtsStateConnected) {
 			return true
 		}
 	}

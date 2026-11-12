@@ -7,6 +7,28 @@ import (
 	"localrdp/internal/store"
 )
 
+// TestHasSessionFollowsTheWindow: 回到会话 只能指向还开着的窗口——标签留着是为了
+// 看退出码，窗口没了就不算会话。
+func TestHasSessionFollowsTheWindow(t *testing.T) {
+	open := Tab{Open: true}
+	done := Tab{Open: false}
+	cases := []struct {
+		name string
+		st   State
+		want bool
+	}{
+		{"no tabs at all", State{Active: -1}, false},
+		{"the active tab is closed", State{Sessions: []Tab{done}, Active: 0}, false},
+		{"the active tab is open", State{Sessions: []Tab{open}, Active: 0}, true},
+		{"active past the end", State{Sessions: []Tab{open}, Active: 3}, false},
+	}
+	for _, c := range cases {
+		if got := c.st.hasSession(); got != c.want {
+			t.Errorf("%s: hasSession() = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 // formNumbers is the only place the typed text becomes numbers: empty keeps
 // what the form had, garbage falls back to the store's defaults, the timeout
 // never drops below 5 and an empty scale stays "no scale asked for".

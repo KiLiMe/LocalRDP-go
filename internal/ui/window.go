@@ -59,9 +59,10 @@ func (st *State) titleBar(c *myui.Context) {
 	})
 }
 
-// hasSession reports whether a session's view is in front.
+// hasSession reports whether a session's view is in front: a tab whose
+// window is gone is not something 回到会话 could go back to.
 func (st *State) hasSession() bool {
-	return st.Active >= 0 && st.Active < len(st.Sessions)
+	return st.Active >= 0 && st.Active < len(st.Sessions) && st.Sessions[st.Active].Open
 }
 
 // openSettings opens the settings dialog on a copy of what is saved, so

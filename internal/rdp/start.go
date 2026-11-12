@@ -47,13 +47,21 @@ func cmdStart(opt StartOptions) int {
 		printOutf("Closed %d host process(es) that had no window.", n)
 	}
 	if sid := getChildSessionID(); sid != kNoSession {
-		if sessionAlive(sid) {
+		if sessionInUse(sid) {
 			printOutf("A child session already exists (id=%d). Run `localrdp stop` first.", sid)
 			return int(ExitConflict)
 		}
-		// 子会话注销后 WTSGetChildSessionId 会留下旧 id，别被它卡住。
-		logWarn("忽略残留的子会话 id=" + win32.Itoa(int(sid)) + "（WTS 枚举里已不存在）")
-		printOutf("Ignoring stale child session id=%d: no such session in the WTS list.", sid)
+		if sessionAlive(sid) {
+			// 刚注销的会话会在 WTS 里留一会儿（Disc）。把它当成“有人用”
+			// 就会让紧接着的下一次打开被拒——那正是“关了窗口就打不开”。
+			logf("清理残留子会话 id=%d（登记状态不是使用中）", sid)
+			printOutf("Cleaning up the leftover child session id=%d before starting.", sid)
+			wtLogoffSession(sid, false)
+		} else {
+			// 子会话注销后 WTSGetChildSessionId 会留下旧 id，别被它卡住。
+			logWarn("忽略残留的子会话 id=" + win32.Itoa(int(sid)) + "（WTS 枚举里已不存在）")
+			printOutf("Ignoring stale child session id=%d: no such session in the WTS list.", sid)
+		}
 	}
 	if opt.Command == "" && !opt.Desktop {
 		printOut("No program specified; opening the child desktop only.")

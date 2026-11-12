@@ -29,7 +29,7 @@ func (st *State) sessionDialog(c *myui.Context) {
 				st.SessionOpen = false
 				st.Act.Do(func() { st.Act.CloseSession(id) })
 			})
-			myui.PrimaryButton(c, locales.ShowSession()).Height(30).OnClick(func() {
+			myui.PrimaryButton(c, locales.ShowSession()).Height(30).Disabled(!tab.Open).OnClick(func() {
 				st.Act.Do(func() { st.Act.ShowSession(id) })
 			})
 		}, func() {

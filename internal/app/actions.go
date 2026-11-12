@@ -171,6 +171,9 @@ func (a *actions) finish(id string, code int) {
 			}
 		}
 		a.St.Open = false
+		// 窗口没了，那张“回到会话”的卡片就不能再持在屏上：它指着
+		// 一个已经不存在的窗口，点不动的感觉像程序卡住了。
+		a.St.SessionOpen = false
 	})
 	a.Do(a.RefreshStatus)
 	if code == 0 || code == 4 {
