@@ -13,7 +13,7 @@ func systemLang() string {
 	// The primary language id is the low 10 bits: 4 is Chinese, in either
 	// script.
 	if uint16(langID)&0x3ff == 0x04 {
-		return "zh"
+		return Chinese
 	}
-	return "en"
+	return English
 }

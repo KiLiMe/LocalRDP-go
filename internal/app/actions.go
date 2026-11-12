@@ -14,6 +14,7 @@ import (
 	"localrdp/internal/store"
 	"localrdp/internal/ui"
 	"localrdp/internal/win32"
+	"localrdp/locales"
 )
 
 // actions is the App as the interface calls it: every method changes the
@@ -40,19 +41,19 @@ func (a *actions) validate() (store.Session, bool) {
 	s.Title = strings.TrimSpace(s.Title)
 	s.Mode = "desktop"
 	if s.Timeout < 5 {
-		st.FormErr, st.FormErrOn = ui.T("The timeout is at least 5 seconds."), "timeout"
+		st.FormErr, st.FormErrOn = locales.ErrTimeout(), "timeout"
 		return s, false
 	}
 	if s.Width < 320 || s.Height < 200 {
-		st.FormErr, st.FormErrOn = ui.T("The size is at least 320 by 200."), "width"
+		st.FormErr, st.FormErrOn = locales.ErrSize(), "width"
 		return s, false
 	}
 	if badUserName(s.User) {
-		st.FormErr, st.FormErrOn = ui.T("The user name cannot hold a quote."), "user"
+		st.FormErr, st.FormErrOn = locales.ErrUserNameQuote(), "user"
 		return s, false
 	}
 	if s.Scale < 0 || s.Scale > 500 || (s.Scale > 0 && s.Scale < 100) {
-		st.FormErr, st.FormErrOn = ui.T("The scale is between 100 and 500 percent, or empty."), "scale"
+		st.FormErr, st.FormErrOn = locales.ErrScale(), "scale"
 		return s, false
 	}
 	return s, true
@@ -77,13 +78,13 @@ func (a *actions) OpenSession() {
 		password = store.LoadSecret()
 	}
 	if s.User != "" && password == "" {
-		st.FormErr, st.FormErrOn = ui.T("A password is needed for that account."), "password"
+		st.FormErr, st.FormErrOn = locales.ErrPasswordNeeded(), "password"
 		a.Invalidate()
 		return
 	}
 	st.Form = s
 	st.Busy = true
-	st.Status = ui.T("Opening…")
+	st.Status = locales.Opening()
 	a.Invalidate()
 	go a.open(s, password)
 }
@@ -134,8 +135,8 @@ func (a *actions) open(s store.Session, password string) {
 		}
 		a.St.Open = true
 		a.St.SessionOpen = true
-		a.St.Status = ui.T("Running")
-		a.St.Notify(ui.T("Running") + " · " + s.Label())
+		a.St.Status = locales.Running()
+		a.St.Notify(locales.Running() + " · " + s.Label())
 	})
 	time.Sleep(1200 * time.Millisecond)
 	a.Do(a.RefreshStatus)
@@ -185,7 +186,7 @@ func (a *actions) finish(id string, code int) {
 				a.St.Active = -1
 			}
 			if code != 0 {
-				a.St.Status = ui.T("Done") + " (" + strconv.Itoa(code) + ")"
+				a.St.Status = locales.Done() + " (" + strconv.Itoa(code) + ")"
 			}
 		})
 	}
@@ -213,16 +214,16 @@ func (a *actions) LogOff() {
 		return
 	}
 	st.Busy = true
-	st.Status = ui.T("Logging off…")
+	st.Status = locales.LoggingOff()
 	a.Invalidate()
 	go func() {
 		out, code := runSelf("stop")
 		a.appendLog(nonEmptyLines(out))
 		if code != 0 && code != 2 {
-			a.appendLog([]string{ui.T("Logging off failed.") + " (" + strconv.Itoa(code) + ")"})
+			a.appendLog([]string{locales.ErrLogOff() + " (" + strconv.Itoa(code) + ")"})
 		}
 		a.setBusy(false, "")
-		a.Do(func() { a.St.Notify(ui.T("Done")) })
+		a.Do(func() { a.St.Notify(locales.Done()) })
 		a.Do(a.RefreshStatus)
 	}()
 }
@@ -232,8 +233,8 @@ func (a *actions) ForgetPassword() {
 	_ = store.ForgetSecret()
 	a.Do(func() {
 		a.St.Password = ""
-		a.St.Status = ui.T("Password forgotten")
-		a.St.Notify(ui.T("Password forgotten"))
+		a.St.Status = locales.PasswordForgotten()
+		a.St.Notify(locales.PasswordForgotten())
 	})
 }
 
@@ -241,7 +242,7 @@ func (a *actions) ForgetPassword() {
 func (a *actions) OpenDataFolder() {
 	_ = os.MkdirAll(store.Dir(), 0o755)
 	_ = exec.Command("explorer.exe", store.Dir()).Start()
-	a.Do(func() { a.St.Notify(ui.T("Open the data folder") + " · " + store.Dir()) })
+	a.Do(func() { a.St.Notify(locales.OpenDataFolder() + " · " + store.Dir()) })
 }
 
 // ShowSession brings a session's child window to the front.
@@ -310,8 +311,8 @@ func (a *actions) CopyLog() {
 		return
 	}
 	a.Do(func() {
-		a.St.Status = ui.T("Log copied")
-		a.St.Notify(ui.T("Log copied"))
+		a.St.Status = locales.LogCopied()
+		a.St.Notify(locales.LogCopied())
 	})
 }
 
@@ -339,8 +340,8 @@ func (a *actions) SaveSettings() {
 	a.Do(func() { a.St.Settings = s })
 	_ = store.SaveSettings(s)
 	a.Do(func() {
-		a.St.Status = ui.T("Saved")
-		a.St.Notify(ui.T("Saved"))
+		a.St.Status = locales.Saved()
+		a.St.Notify(locales.Saved())
 	})
 }
 

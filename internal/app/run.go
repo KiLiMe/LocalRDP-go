@@ -7,6 +7,7 @@ import (
 	"github.com/egoist/mygo"
 	myui "github.com/egoist/mygo/ui"
 
+	"localrdp/internal/i18n"
 	"localrdp/internal/store"
 	"localrdp/internal/ui"
 )
@@ -30,6 +31,9 @@ func Run(opts Options) int {
 	a.Opts = opts
 	launched := false
 	mygo.App.WhenReady(func() {
+		// Say the language again now that MyGo's main thread is up: its own
+		// menus and controls follow it, as the catalogs do.
+		setLanguage(i18n.Lang())
 		win := mygo.NewWindow(mygo.WindowOptions{
 			Title:          "LocalRDP",
 			Width:          1000,

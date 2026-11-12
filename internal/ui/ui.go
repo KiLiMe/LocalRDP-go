@@ -10,12 +10,8 @@ package ui
 import (
 	myui "github.com/egoist/mygo/ui"
 
-	"localrdp/internal/i18n"
 	"localrdp/internal/store"
 )
-
-// T is the text of the interface in the chosen language.
-func T(s string) string { return i18n.T(s) }
 
 // Actions is what a click does: the window, as the interface sees it.
 type Actions interface {

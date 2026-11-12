@@ -6,8 +6,8 @@ import (
 
 	"github.com/lxn/win"
 
-	"localrdp/internal/i18n"
 	"localrdp/internal/win32"
+	"localrdp/locales"
 )
 
 // The bar the host window draws above the Remote Desktop control. On the left
@@ -341,22 +341,22 @@ func (s *hostState) barModel() barModel {
 func (m barModel) status() (label string, dot, fg, bg, bd uint32) {
 	switch {
 	case m.loggedIn:
-		return i18n.T("Connected"), barGreen, barGreenTx, barGreenBg, barGreenBd
+		return locales.Connected(), barGreen, barGreenTx, barGreenBg, barGreenBd
 	case m.everConnected:
-		return i18n.T("Disconnected"), barTxLo, barTxLo, barChip, barChipBd
+		return locales.Disconnected(), barTxLo, barTxLo, barChip, barChipBd
 	default:
-		return i18n.T("Connecting…"), barAmber, barAmber, barAmberBg, barAmberBd
+		return locales.Connecting(), barAmber, barAmber, barAmberBg, barAmberBd
 	}
 }
 
 // buttons lays the three buttons out from the right edge of the window.
 func (m barModel) buttons(hdc win.HDC, width int32) []barButton {
 	defs := []barButton{
-		{label: i18n.T("Disconnect"), cmd: cmdDisconnect, glyph: glyphPower,
+		{label: locales.Disconnect(), cmd: cmdDisconnect, glyph: glyphPower,
 			fg: barRedTx, bg: barRedBg, bd: barRedBd, hi: barRedHi},
-		{label: i18n.T("Reconnect"), cmd: cmdReconnect, glyph: glyphRefresh,
+		{label: locales.Reconnect(), cmd: cmdReconnect, glyph: glyphRefresh,
 			fg: barAmber, bg: barChip, bd: barChipBd, hi: barChipHi},
-		{label: i18n.T("Full screen"), cmd: cmdFullScreen, glyph: glyphFullScreen,
+		{label: locales.FullScreen(), cmd: cmdFullScreen, glyph: glyphFullScreen,
 			fg: barBlue, bg: barChip, bd: barChipBd, hi: barChipHi},
 	}
 	y := (m.m.h - m.m.btnH) / 2
@@ -452,7 +452,7 @@ func (m barModel) paint(hdc win.HDC, width, height int32) []barButton {
 	label, dot, fg, bg, bd := m.status()
 	x = pill(hdc, m.m, x, mid, label, dot, fg, bg, bd, 0)
 	if m.loggedIn && m.sid != kNoSession {
-		pill(hdc, m.m, x+m.m.pillGap, mid, i18n.T("Child session")+" "+win32.Itoa(int(m.sid)),
+		pill(hdc, m.m, x+m.m.pillGap, mid, locales.ChildSession()+" "+win32.Itoa(int(m.sid)),
 			0, barTxLo, barChip, barChipBd, glyphPerson)
 	}
 

@@ -9,8 +9,8 @@ import (
 
 	"github.com/lxn/win"
 
-	"localrdp/internal/i18n"
 	"localrdp/internal/win32"
+	"localrdp/locales"
 )
 
 var (
@@ -101,5 +101,5 @@ func sessionTitle(base string, sid uint32) string {
 	if sid == 0 {
 		return base
 	}
-	return base + " · " + i18n.T("Child session") + " " + win32.Itoa(int(sid))
+	return base + " · " + locales.ChildSession() + " " + win32.Itoa(int(sid))
 }

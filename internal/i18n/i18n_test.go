@@ -1,24 +1,22 @@
 package i18n
 
-import "testing"
+import (
+	"testing"
+
+	"localrdp/locales"
+)
 
 func TestTranslatedStrings(t *testing.T) {
 	old := Lang()
 	defer Set(old)
 
 	Set("zh")
-	if got := T("Settings"); got != "设置" {
-		t.Fatalf(`T("Settings") = %q in Chinese, want 设置`, got)
+	if got := locales.Settings(); got != "设置" {
+		t.Fatalf("Settings = %q in Chinese, want 设置", got)
 	}
 	Set("en")
-	if got := T("Settings"); got != "Settings" {
-		t.Fatalf(`T("Settings") = %q in English, want Settings`, got)
-	}
-	if got := T("a string no one translated"); got != "a string no one translated" {
-		t.Fatalf("an unknown string was changed: %q", got)
-	}
-	if got := T(""); got != "" {
-		t.Fatalf("the empty string changed: %q", got)
+	if got := locales.Settings(); got != "Settings" {
+		t.Fatalf("Settings = %q in English, want Settings", got)
 	}
 }
 
@@ -28,8 +26,22 @@ func TestSetOnlyKeepsTheTwoLanguages(t *testing.T) {
 
 	Set("zh")
 	Set("fr")
-	if got := Lang(); got != "en" {
+	if got := Lang(); got != English {
 		t.Fatalf("Lang() = %q after Set(fr), want en", got)
+	}
+}
+
+func TestLocaleNamesTheCatalogLanguage(t *testing.T) {
+	old := Lang()
+	defer Set(old)
+
+	Set("zh")
+	if got := Locale(); got != "zh-Hans" {
+		t.Fatalf("Locale() = %q in Chinese, want zh-Hans", got)
+	}
+	Set("en")
+	if got := Locale(); got != "en" {
+		t.Fatalf("Locale() = %q in English, want en", got)
 	}
 }
 

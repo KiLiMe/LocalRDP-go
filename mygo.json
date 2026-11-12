@@ -8,5 +8,6 @@
   "out": "build",
   "icon": "winres/localrdp.png",
   "resources": ["LICENSE"],
+  "i18n": { "dir": "locales", "source": "en" },
   "windows": { "displayName": "LocalRDP" }
 }

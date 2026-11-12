@@ -8,6 +8,7 @@ import (
 	myui "github.com/egoist/mygo/ui"
 
 	"localrdp/internal/store"
+	"localrdp/locales"
 )
 
 // console is the form of the session to open: one line at the top that
@@ -37,17 +38,17 @@ func (st *State) consoleHead(c *myui.Context) {
 	t := c.Theme()
 	myui.Row(c).Padding(14, 18, 10, 18).Shrink(0).Gap(10).AlignItems(myui.Center).Children(func() {
 		myui.Icon(c, iconDesktop.svg).Size(18, 18).TextColor(t.Accent)
-		myui.Text(c, T("New session…")).FontSize(17).Bold().TextColor(t.Text).SingleLine()
+		myui.Text(c, locales.NewSessionMenu()).FontSize(17).Bold().TextColor(t.Text).SingleLine()
 		myui.Spacer(c)
 		if st.Busy {
 			myui.Text(c, st.Status).FontSize(11).TextColor(t.TextMuted).SingleLine()
 		}
 		if st.hasSession() {
-			myui.Button(c, T("Back to the session")).Height(30).OnClick(func() {
+			myui.Button(c, locales.BackToSession()).Height(30).OnClick(func() {
 				st.SessionOpen = true
 			})
 		}
-		myui.PrimaryButton(c.Key("open"), T("Open child session")).Height(30).
+		myui.PrimaryButton(c.Key("open"), locales.OpenChildSession()).Height(30).
 			Disabled(st.Busy).OnClick(func() { st.Act.Do(st.Act.OpenSession) })
 	})
 }
@@ -126,24 +127,24 @@ func (st *State) field(c *myui.Context, name, label string, input func()) {
 // accountCard is the account of the child session, and its password.
 func (st *State) accountCard(c *myui.Context) {
 	t := c.Theme()
-	card(c, T("Account"), func() {
-		cardAction(c, iconTrash, T("Forget password"), func() {
+	card(c, locales.Account(), func() {
+		cardAction(c, iconTrash, locales.ForgetPassword(), func() {
 			st.Act.Do(st.Act.ForgetPassword)
 		})
 	}, func() {
-		st.field(c, "user", T("User name"), func() {
+		st.field(c, "user", locales.UserName(), func() {
 			myui.TextInput(c.Key("user"), &st.Form.User).Placeholder(currentUser()).Height(30)
 		})
-		st.field(c, "password", T("Password"), func() {
+		st.field(c, "password", locales.Password(), func() {
 			myui.Row(c).Gap(6).AlignItems(myui.Center).Children(func() {
 				myui.TextInput(c.Key("password"), &st.Password).Password().Grow(1).Height(30).
-					Placeholder(pickText(storeHasSecret(), T("Password is cached. Type a new one to replace it."), ""))
-				myui.Button(c, T("Clear")).Height(30).Disabled(st.Password == "").
+					Placeholder(pickText(storeHasSecret(), locales.PasswordCached(), ""))
+				myui.Button(c, locales.Clear()).Height(30).Disabled(st.Password == "").
 					OnClick(func() { st.Password = "" })
 			})
 		})
-		myui.Checkbox(c, &st.SavePassword, T("Keep the password"))
-		myui.Text(c, T("Keep the password between runs, encrypted for this user.")).
+		myui.Checkbox(c, &st.SavePassword, locales.KeepPassword())
+		myui.Text(c, locales.KeepPasswordNote()).
 			FontSize(11).TextColor(t.TextMuted).Wrap()
 	})
 }
@@ -151,12 +152,12 @@ func (st *State) accountCard(c *myui.Context) {
 // sessionCard is what runs in the child session once it connects.
 func (st *State) sessionCard(c *myui.Context) {
 	t := c.Theme()
-	card(c, T("Session settings"), nil, func() {
-		st.field(c, "program", T("Run a program"), func() {
+	card(c, locales.SessionSettings(), nil, func() {
+		st.field(c, "program", locales.RunProgram(), func() {
 			myui.TextInput(c.Key("program"), &st.Form.Program).Height(30).
-				Placeholder(T("Program and arguments, as a command line"))
+				Placeholder(locales.ProgramNote())
 		})
-		myui.Text(c, T("Starts in the child session once it connects. Leave it empty for the desktop alone.")).
+		myui.Text(c, locales.ProgramHint()).
 			FontSize(11).TextColor(t.TextMuted).Wrap()
 	})
 }
@@ -164,23 +165,23 @@ func (st *State) sessionCard(c *myui.Context) {
 // statusCard is what is open and what is cached: two tiles that read at a
 // glance, and the buttons that ask again or end it.
 func (st *State) statusCard(c *myui.Context) {
-	card(c, T("Running state"), func() {
-		iconButton(c, iconFolderOpen, T("Open the data folder"), false, func() {
+	card(c, locales.RunningState(), func() {
+		iconButton(c, iconFolderOpen, locales.OpenDataFolder(), false, func() {
 			st.Act.Do(st.Act.OpenDataFolder)
 		})
-		iconButton(c, iconRefresh, T("Refresh"), false, func() {
+		iconButton(c, iconRefresh, locales.Refresh(), false, func() {
 			st.Act.Do(st.Act.RefreshStatus)
 		})
 		if st.Open {
-			iconButton(c, iconLogoff, T("Log off the child session"), false, func() {
+			iconButton(c, iconLogoff, locales.LogOffChildSession(), false, func() {
 				st.Act.Do(st.Act.LogOff)
 			})
 		}
 	}, func() {
 		myui.Row(c).Gap(8).Children(func() {
-			st.tile(c, T("Child session"), pickText(st.Open, st.SessionID, T("None")), st.Open)
+			st.tile(c, locales.ChildSession(), pickText(st.Open, st.SessionID, locales.None()), st.Open)
 			hasSecret := storeHasSecret()
-			st.tile(c, T("Cached password"), pickText(hasSecret, T("Saved encrypted"), T("Not saved")), hasSecret)
+			st.tile(c, locales.CachedPassword(), pickText(hasSecret, locales.SavedEncrypted(), locales.NotSaved()), hasSecret)
 		})
 	})
 }
@@ -207,19 +208,19 @@ func (st *State) logCard(c *myui.Context) {
 	if st.LogOpen {
 		chev = iconChevronUp
 	}
-	card(c, T("Log"), func() {
+	card(c, locales.Log(), func() {
 		iconButton(c, chev,
-			pickText(st.LogOpen, T("Collapse"), T("Expand")), false, func() {
+			pickText(st.LogOpen, locales.Collapse(), locales.Expand()), false, func() {
 				st.LogOpen = !st.LogOpen
 			})
-		iconButton(c, iconCopy, T("Copy"), false, func() { st.Act.Do(st.Act.CopyLog) })
-		iconButton(c, iconBroom, T("Clear"), false, func() { st.Act.Do(st.Act.ClearLog) })
+		iconButton(c, iconCopy, locales.Copy(), false, func() { st.Act.Do(st.Act.CopyLog) })
+		iconButton(c, iconBroom, locales.Clear(), false, func() { st.Act.Do(st.Act.ClearLog) })
 	}, func() {
 		if !st.LogOpen {
 			return
 		}
 		if st.Log == "" {
-			myui.Text(c, T("No log yet.")).FontSize(11).TextColor(t.TextMuted)
+			myui.Text(c, locales.NoLog()).FontSize(11).TextColor(t.TextMuted)
 			return
 		}
 		myui.Column(c).Height(180).Radius(8).Padding(10).Background(tile(t)).Children(func() {
@@ -249,44 +250,44 @@ func (r resolution) label() string {
 // displayCard is the host window: its title and size, and how it connects.
 func (st *State) displayCard(c *myui.Context) {
 	t := c.Theme()
-	card(c, T("Host window and display"), nil, func() {
-		st.field(c, "title", T("Title"), func() {
+	card(c, locales.HostWindowDisplay(), nil, func() {
+		st.field(c, "title", locales.WindowTitle(), func() {
 			myui.TextInput(c.Key("title"), &st.Form.Title).Placeholder("LocalRDP").Height(30)
 		})
-		st.field(c, "size", T("Window size"), func() { st.sizeChoice(c) })
+		st.field(c, "size", locales.WindowSize(), func() { st.sizeChoice(c) })
 		myui.Text(c, st.sizeHint()).FontSize(11).TextColor(t.TextMuted).Wrap()
 		myui.Row(c).Gap(8).AlignItems(myui.Center).Children(func() {
-			myui.Text(c, T("Resolution")).FontSize(12).TextColor(t.TextMuted).Grow(1)
-			myui.Text(c, pickText(st.CustomRes, T("Editing custom size"), T("Already a preset"))).
+			myui.Text(c, locales.Resolution()).FontSize(12).TextColor(t.TextMuted).Grow(1)
+			myui.Text(c, pickText(st.CustomRes, locales.ResolutionCustom(), locales.ResolutionPreset())).
 				FontSize(10).TextColor(pickColor(t, st.CustomRes, t.Accent, t.TextMuted))
 		})
 		st.resolutionPills(c)
 		myui.Row(c).Gap(10).AlignItems(myui.Start).Children(func() {
 			myui.Column(c).Grow(1).Basis(0).MinWidth(0).Children(func() {
-				st.field(c, "width", T("Width"), func() { st.lockedInput(c, "width", &st.WidthText) })
+				st.field(c, "width", locales.Width(), func() { st.lockedInput(c, "width", &st.WidthText) })
 			})
 			myui.Column(c).Grow(1).Basis(0).MinWidth(0).Children(func() {
-				st.field(c, "height", T("Height"), func() { st.lockedInput(c, "height", &st.HeightText) })
+				st.field(c, "height", locales.Height(), func() { st.lockedInput(c, "height", &st.HeightText) })
 			})
 			myui.Column(c).Grow(0.6).Basis(0).MinWidth(0).Children(func() {
-				st.field(c, "scale", T("Scale")+" %", func() {
+				st.field(c, "scale", locales.Scale()+" %", func() {
 					myui.TextInput(c.Key("scale"), &st.ScaleText).Height(30).
-						Placeholder(T("None"))
+						Placeholder(locales.None())
 				})
 			})
 		})
-		myui.Text(c, T("Scale percent from 100 to 500, empty for none: it sizes the desktop, and the picture is fitted into the window, never stretched past its size.")).
+		myui.Text(c, locales.ScaleHint()).
 			FontSize(11).TextColor(t.TextMuted).Wrap()
 		myui.Divider(c)
-		myui.Text(c, T("Window and connection")).FontSize(12).TextColor(t.TextMuted)
+		myui.Text(c, locales.WindowAndConnection()).FontSize(12).TextColor(t.TextMuted)
 		myui.Row(c).Gap(18).Wrap().Children(func() {
-			myui.Checkbox(c, &st.Form.FullScreen, T("Full screen"))
-			myui.Checkbox(c, &st.Form.KeepSession, T("Keep session"))
-			myui.Checkbox(c, &st.Form.Minimized, T("Minimized"))
-			myui.Checkbox(c, &st.Form.NoScaleInherit, T("No inherited scaling"))
+			myui.Checkbox(c, &st.Form.FullScreen, locales.FullScreen())
+			myui.Checkbox(c, &st.Form.KeepSession, locales.KeepSession())
+			myui.Checkbox(c, &st.Form.Minimized, locales.Minimized())
+			myui.Checkbox(c, &st.Form.NoScaleInherit, locales.NoInheritedScaling())
 		})
-		myui.Text(c, T("No inherited scaling hint")).FontSize(11).TextColor(t.TextMuted).Wrap()
-		st.field(c, "timeout", T("Timeout")+" ("+T("Second")+")", func() {
+		myui.Text(c, locales.NoInheritedScalingHint()).FontSize(11).TextColor(t.TextMuted).Wrap()
+		st.field(c, "timeout", locales.Timeout()+" ("+locales.Second()+")", func() {
 			myui.TextInput(c.Key("timeout"), &st.TimeoutText).Height(30)
 		})
 	})
@@ -316,7 +317,7 @@ func (st *State) resolutionPills(c *myui.Context) {
 				st.CustomRes = false
 			})
 		}
-		pill(c, T("Custom resolution"), st.CustomRes, 2, &iconSliders, func() {
+		pill(c, locales.CustomResolution(), st.CustomRes, 2, &iconSliders, func() {
 			st.CustomRes = true
 		})
 	})
@@ -351,11 +352,11 @@ func pill(c *myui.Context, label string, on bool, span int, ic *icon, fn func())
 func (st *State) sizeHint() string {
 	switch store.NormalizeSizeMode(st.Form.SizeMode) {
 	case store.SizeFit:
-		return T("Follow: the desktop takes the size of the window, so the window can be dragged and text shrinks and grows with it.")
+		return locales.FollowHint()
 	case store.SizeScale:
-		return T("Stretch: the desktop keeps its resolution; a smaller window shrinks the whole picture to fit, a bigger window leaves it at its size in the middle.")
+		return locales.StretchHint()
 	}
-	return T("Fixed: the window and the desktop stay at the width and height below (a screen that cannot hold that size cuts them down).")
+	return locales.FixedHint()
 }
 
 // sizeChoice is the window-size segmented control: an index in the State
@@ -367,7 +368,7 @@ func (st *State) sizeChoice(c *myui.Context) {
 		st.sizeModeSeen = st.Form.SizeMode
 	}
 	myui.Segmented(c.Key("size"), &st.SizeIndex,
-		T("Fixed size"), T("Follow window"), T("Stretch"))
+		locales.FixedSize(), locales.FollowWindow(), locales.Stretch())
 	if i := st.SizeIndex; i >= 0 && i < len(modes) && modes[i] != st.Form.SizeMode {
 		st.Form.SizeMode = modes[i]
 		st.sizeModeSeen = modes[i]

@@ -8,16 +8,16 @@ import (
 
 	"github.com/lxn/win"
 
-	"localrdp/internal/i18n"
+	"localrdp/locales"
 )
 
 // sessionTitle 少了会话号，任务栏上两个按钮就都叫 LocalRDP。
 func TestSessionTitleCarriesTheSessionID(t *testing.T) {
 	got := sessionTitle("LocalRDP", 48)
-	if want := "LocalRDP · " + i18n.T("Child session") + " 48"; got != want {
+	if want := "LocalRDP · " + locales.ChildSession() + " 48"; got != want {
 		t.Fatalf("sessionTitle = %q, want %q", got, want)
 	}
-	if got := sessionTitle("  ", 48); got != "LocalRDP · "+i18n.T("Child session")+" 48" {
+	if got := sessionTitle("  ", 48); got != "LocalRDP · "+locales.ChildSession()+" 48" {
 		t.Fatalf("sessionTitle of a blank title = %q", got)
 	}
 	if got := sessionTitle("LocalRDP", 0); got != "LocalRDP" {

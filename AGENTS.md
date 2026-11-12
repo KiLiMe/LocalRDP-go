@@ -25,8 +25,10 @@
 main.go                  入口：os.Exit(rdp.Run(os.Args))
 internal/rdp/            命令行 + RDP 宿主（COM 容器、会话启动、顶栏、mcp）
 internal/app/  ui/       窗口逻辑 / 只读 State 的绘制
-internal/store/ i18n/    设置与 DPAPI 密码 / 中英文案
+internal/store/          设置与 DPAPI 密码
+internal/i18n/           语言选择：中文还是英文
 internal/win32/ mcp/     Win32 小工具 / MCP 协议层
+locales/                 消息：en.json 源 + zh-Hans.json 中文，catalog_gen.go 是生成的
 Scripts/build.ps1         构建：mygo 打包 + -X 注入 + zip 发布
 mygo.json                exe 的名字、版本、图标、产物目录（mygo 的打包配置）
 ```
@@ -40,6 +42,9 @@ mygo.json                exe 的名字、版本、图标、产物目录（mygo �
 > 始终以干净、模块化的方式写代码，架构合理、职责分离。不要因为是我提的需求就硬塞功能。如果找不到自然的方式实现，且你认为该重构才能让整体更干净，那就提前停下来说明。
 
 - 新增依赖前先确认依赖方向没被打穿，分层见上面「目录」一节。
+- 界面文案只写在 `locales/en.json` 与 `locales/zh-Hans.json` 里，改完跑 `go tool mygo generate`
+  重新生成 `locales/catalog_gen.go`（生成物，别手改），代码里调 `locales.Settings()` 这样的
+  accessor：拿英文当 key 查表的写法已经被这一层替掉了。
 - 版本号只认 `mygo.json` 的 `version`：改版本只改这一处，`pwsh .\Scripts\build.ps1` 会经 `MYGO_LDFLAGS`
   把同一个数字注入程序，并从 exe 属性里读回来对账。图标与版本信息由 `go tool mygo build`
   从 `winres/localrdp.png` 与 `mygo.json` 注入，仓库里没有 `.syso`，也**不要**手工塞一个进去

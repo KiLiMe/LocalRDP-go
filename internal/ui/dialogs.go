@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"localrdp/internal/store"
+	"localrdp/locales"
 
 	myui "github.com/egoist/mygo/ui"
 )
@@ -16,12 +17,12 @@ func (st *State) settingsDialog(c *myui.Context) {
 	t := c.Theme()
 	myui.Modal(c, &st.SettingsOpen, func() {
 		d := &st.SettingsDraft
-		st.dialog(c, T("Settings"), T("Settings hint"), func() {
-			myui.Button(c, T("Cancel")).Height(30).OnClick(func() {
+		st.dialog(c, locales.Settings(), locales.SettingsHint(), func() {
+			myui.Button(c, locales.Cancel()).Height(30).OnClick(func() {
 				setLang(st.Settings.Lang)
 				st.SettingsOpen = false
 			})
-			myui.PrimaryButton(c, T("Save")).Height(30).OnClick(func() {
+			myui.PrimaryButton(c, locales.Save()).Height(30).OnClick(func() {
 				st.Settings = *d
 				if !st.Settings.SavePasswords {
 					st.SavePassword = false
@@ -30,15 +31,15 @@ func (st *State) settingsDialog(c *myui.Context) {
 				st.Act.Do(st.Act.SaveSettings)
 			})
 		}, func() {
-			myui.Text(c, T("Language")).FontSize(12).TextColor(t.TextMuted).Margin(16, 0, 6, 0)
+			myui.Text(c, locales.Language()).FontSize(12).TextColor(t.TextMuted).Margin(16, 0, 6, 0)
 			lang := st.settingsLangIndex()
 			if myui.Segmented(c, &lang, "English", "中文").Height(30).Changed() {
 				d.Lang = pickLang(lang)
 				setLang(d.Lang)
 			}
 			myui.Divider(c).Margin(18, 0, 16, 0)
-			checkRow(c, &d.SavePasswords, T("Keep passwords"), T("Keep passwords hint"))
-			checkRow(c, &d.Remember, T("Remember the last session"), T("Remember hint")).
+			checkRow(c, &d.SavePasswords, locales.KeepPasswords(), locales.KeepPasswordsHint())
+			checkRow(c, &d.Remember, locales.RememberSession(), locales.RememberHint()).
 				Margin(14, 0, 0, 0)
 		})
 	})

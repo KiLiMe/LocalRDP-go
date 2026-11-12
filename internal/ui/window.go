@@ -3,6 +3,8 @@ package ui
 
 import (
 	myui "github.com/egoist/mygo/ui"
+
+	"localrdp/locales"
 )
 
 // view builds a frame of the window.
@@ -51,9 +53,9 @@ func (st *State) titleBar(c *myui.Context) {
 		myui.Text(c, "LocalRDP").FontSize(13).Bold().TextColor(t.Text).DragWindow()
 		myui.Box(c).Grow(1)
 		if st.hasSession() {
-			iconButton(c, iconDesktopOn, T("Session"), st.SessionOpen, func() { st.SessionOpen = true })
+			iconButton(c, iconDesktopOn, locales.Session(), st.SessionOpen, func() { st.SessionOpen = true })
 		}
-		iconButton(c, iconSettings, T("Settings"), false, st.openSettings)
+		iconButton(c, iconSettings, locales.Settings(), false, st.openSettings)
 	})
 }
 
