@@ -3,21 +3,28 @@ package rdp
 import "testing"
 
 // 放得下的请求原样返回：宽取偶，高加上顶栏，水平居中。
+//
+// 请求取 641×480：CI 的 1024×768 工作区放得下，屏幕更小时直接跳过——
+// 把“屏幕小”当成失败，只会让自己在 CI 上红着。
 func TestDefaultWindowRectHonoursAFittingSize(t *testing.T) {
 	wa := primaryWorkArea()
-	opt := &StartOptions{Width: 1201, Height: 800, X: cwUseDefault, Y: cwUseDefault}
+	areaW, areaH := int(wa.Right-wa.Left), int(wa.Bottom-wa.Top)
+	if areaW < 700 || areaH < 600 {
+		t.Skipf("the work area is %dx%d, too small for a 641x480 window", areaW, areaH)
+	}
+	opt := &StartOptions{Width: 641, Height: 480, X: cwUseDefault, Y: cwUseDefault}
 	x, y, cw, ch, clamped := defaultWindowRect(opt, 96)
 	if clamped {
-		t.Fatalf("clamped = true for a 1201x800 window in the work area")
+		t.Fatalf("clamped = true for a 641x480 window in a %dx%d work area", areaW, areaH)
 	}
-	if cw != 1200 {
-		t.Fatalf("width = %d, want 1200 (even)", cw)
+	if cw != 640 {
+		t.Fatalf("width = %d, want 640 (even)", cw)
 	}
-	if ch != 800+newBarMetrics(96).h {
-		t.Fatalf("height = %d, want %d (800 plus the bar)", ch, 800+newBarMetrics(96).h)
+	if ch != 480+newBarMetrics(96).h {
+		t.Fatalf("height = %d, want %d (480 plus the bar)", ch, 480+newBarMetrics(96).h)
 	}
-	wantX := int32(int(wa.Left) + (int(wa.Right-wa.Left)-1200)/2)
-	if x != wantX || y != int32(int(wa.Top)+(int(wa.Bottom-wa.Top)-int(ch))/2) {
+	wantX := int32(int(wa.Left) + (areaW-640)/2)
+	if x != wantX || y != int32(int(wa.Top)+(areaH-int(ch))/2) {
 		t.Fatalf("position = (%d,%d), want it centered", x, y)
 	}
 }
