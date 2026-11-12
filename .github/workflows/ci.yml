@@ -7,9 +7,16 @@ on:
   pull_request:
   workflow_dispatch:
 
+# 连推几次时不再排队等前一次跑完：同分支/同 tag 上后来的一次起来就取消旧的。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
+# 这里只查代码：vet / gofmt / 测试 / 能不能链接。
+# 图标、版本信息、manifest 是 mygo 打包时注入的，验它们要花 30 秒——那部分只在 tag 上做，见 release。
 jobs:
   windows:
     runs-on: windows-latest
@@ -40,23 +47,13 @@ jobs:
       - name: Test
         run: go test ./...
 
-      - name: Build
-        run: go tool mygo build -platform windows/amd64 -skip-installer -skip-dmg
-
-      - name: Check the exe
+      # 只验链接得上，产物丢掉：不带图标与版本信息，不是发布件。
+      - name: Build (link only)
         shell: pwsh
-        run: |
-          $exe = 'build/windows-amd64/localrdp.exe'
-          if (-not (Test-Path $exe)) { throw "mygo build produced no $exe" }
-          $want = (Get-Content mygo.json -Raw | ConvertFrom-Json).version
-          $got = (Get-Item $exe).VersionInfo.FileVersion
-          if ($got -ne $want) { throw "exe says $got, mygo.json says $want" }
-          # 图形子系统程序的 $LASTEXITCODE 不稳，用 Start-Process 等它退并拿 ExitCode。
-          $p = Start-Process -FilePath $exe -ArgumentList 'help' -Wait -PassThru -NoNewWindow
-          if ($p.ExitCode -ne 0) { throw "$exe help exited $($p.ExitCode)" }
+        run: go build -o "${{ runner.temp }}\localrdp.exe" .
 
   # 同一个 workflow：普通 push 与 PR 只跑上面那个 job，推 v* tag 才多跑这一个。
-  # 上面的 job 已经 vet / gofmt / 测过同一个提交，这里只管打包与发布。
+  # 上面的 job 已经 vet / gofmt / 测过同一个提交，这里只管打包、验 exe 与发布。
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: windows
@@ -81,6 +78,16 @@ jobs:
       - name: Package
         shell: pwsh
         run: pwsh .\Scripts\build.ps1 -Version $env:GITHUB_REF_NAME.Substring(1)
+
+      # build.ps1 已经对账过 exe 属性里的版本；这里再确认它能跑起来。
+      - name: Check the exe
+        shell: pwsh
+        run: |
+          $exe = 'build/windows-amd64/localrdp.exe'
+          if (-not (Test-Path $exe)) { throw "build produced no $exe" }
+          # 图形子系统程序的 $LASTEXITCODE 不稳，用 Start-Process 等它退并拿 ExitCode。
+          $p = Start-Process -FilePath $exe -ArgumentList 'help' -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "$exe help exited $($p.ExitCode)" }
 
       # 说明 = 每版都一样的固定前言（怎么下、怎么跑、首次使用）+ 上一个 tag 以来的提交 + 校验值。
       # 固定前言写在这里，发版时不用手写；需要特别介绍时之后再 `gh release edit --notes-file`。
