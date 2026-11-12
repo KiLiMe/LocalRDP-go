@@ -104,14 +104,18 @@ jobs:
           if (-not (Test-Path $exe)) { throw "build produced no $exe" }
           if (-not (Test-Path $zip)) { throw "build produced no $zip" }
 
+          # 「chore: 版本 x.y.z」是发版那一下的提交，读者已经知道，不列进变化。
+          $skip = '^- chore: 版本 '
           $prev = git describe --tags --abbrev=0 "$tag^"
           if ($LASTEXITCODE -eq 0 -and $prev) {
             $range = "（$prev..$tag）"
-            $changes = (git log "$prev..$tag" --pretty=format:'- %s') -join "`n"
+            $lines = @(git log "$prev..$tag" --pretty=format:'- %s')
           } else {
             $range = ''
-            $changes = (git log $tag --pretty=format:'- %s') -join "`n"
+            $lines = @(git log $tag --pretty=format:'- %s')
           }
+          $changes = @($lines | Where-Object { $_ -notmatch $skip }) -join "`n"
+          if (-not $changes) { $changes = '（只有版本号）' }
           $exeSha = (Get-FileHash $exe -Algorithm SHA256).Hash
           $zipSha = (Get-FileHash $zip -Algorithm SHA256).Hash
 
